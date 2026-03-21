@@ -31,6 +31,10 @@ internal object Config {
 
     val bigSeizureColorId: String = dotenv["BIG_SEIZURE_COLOR_ID"] ?: "3"
 
+    val excludeDrugs: Set<String> = dotenv["EXCLUDE_DRUGS"]
+        ?.split(",")?.map { it.trim().lowercase() }?.toSet()
+        ?: emptySet()
+
     val oauthPort: Int = dotenv["OAUTH_PORT"]?.toInt() ?: 8888
 
     val googleClientId: String = dotenv["GOOGLE_CLIENT_ID"]

@@ -36,7 +36,8 @@ internal fun categorizeEvents(
                     return@forEach
                 }
 
-                parseResult.matches.forEach { parsed ->
+                parseResult.matches.forEach matches@{ parsed ->
+                    if (parsed.name.lowercase() in Config.excludeDrugs) return@matches
                     detectedDrugs += parsed.name
                     drugChanges.getOrPut(parsed.name) { mutableListOf() }
                         .add(DrugChange(eventDate, parsed.dosage))
