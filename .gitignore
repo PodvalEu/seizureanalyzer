@@ -1,0 +1,17 @@
+# Gradle
+.gradle/
+build/
+
+# IDE
+.idea/
+*.iml
+
+# Data (credentials, tokens, generated outputs)
+data/credentials.json
+data/tokens/
+data/*.json
+data/*.csv
+data/*.html
+
+# Claude local settings
+.claude/
