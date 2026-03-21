@@ -316,9 +316,9 @@ private fun buildHtmlTemplate(
 
         #reportChart {
             width: 100%;
-            height: 65vh;
-            min-height: 400px;
-            max-height: 700px;
+            height: 75vh;
+            min-height: 550px;
+            max-height: 900px;
         }
     </style>
 </head>
@@ -364,61 +364,96 @@ private fun buildHtmlTemplate(
 
         const chart = echarts.init(document.getElementById('reportChart'));
 
+        // Separate drug and seizure series
+        const drugSeriesArr = seriesData.filter(s => drugNames.includes(s.name));
+        const seizureSeriesArr = seriesData.filter(s => !drugNames.includes(s.name));
+        const drugColors = {};
+        const laneHeight = 40;
+        const numDrugs = drugNames.length;
+        const laneTotal = laneHeight * numDrugs;
+
+        const grids = [];
+        const xAxes = [];
+        const yAxes = [];
+        const allSeries = [];
+
+        // One grid per drug
+        drugSeriesArr.forEach((ds, i) => {
+            const color = ds.lineStyle?.color || '#999';
+            drugColors[ds.name] = color;
+            const topPx = i * laneHeight;
+            grids.push({ left: 80, right: 50, top: topPx, height: laneHeight - 4, borderColor: '#e2e8f0', borderWidth: 0, backgroundColor: 'transparent' });
+            xAxes.push({ type: 'category', gridIndex: i, data: labels, show: false, boundaryGap: false });
+            yAxes.push({ type: 'value', gridIndex: i, min: 0, max: 1, show: false });
+            allSeries.push({
+                name: ds.name, type: 'line', xAxisIndex: i, yAxisIndex: i,
+                data: ds.data, step: 'end', showSymbol: false, connectNulls: false,
+                lineStyle: { width: 1.5, color: color },
+                areaStyle: { color: color, opacity: 0.25 },
+                itemStyle: { color: color }
+            });
+        });
+
+        // Main seizure grid below drug lanes
+        const mainTop = laneTotal + 8;
+        grids.push({ left: 80, right: 50, top: mainTop, bottom: 32, borderColor: 'transparent' });
+        const mainXIdx = xAxes.length;
+        xAxes.push({
+            type: 'category', gridIndex: numDrugs, data: labels, boundaryGap: false,
+            axisLabel: { color: '#94a3b8', fontSize: 11, hideOverlap: true },
+            axisLine: { lineStyle: { color: '#e2e8f0' } }, axisTick: { show: false }
+        });
+        const mainYIdx = yAxes.length;
+        yAxes.push({
+            type: 'value', gridIndex: numDrugs, position: 'right',
+            axisLabel: { color: '#94a3b8', fontSize: 11 },
+            splitLine: { lineStyle: { color: '#f1f5f9', type: 'dashed' } },
+            minInterval: 1, max: null
+        });
+
+        // Assign seizure series to main grid
+        seizureSeriesArr.forEach(s => {
+            allSeries.push(Object.assign({}, s, { xAxisIndex: mainXIdx, yAxisIndex: mainYIdx }));
+        });
+
+        const axisIndices = xAxes.map((_, i) => i);
+
         const option = {
-            backgroundColor: 'transparent',
-            animationDuration: 300,
+            backgroundColor: 'transparent', animationDuration: 300,
             legend: { show: false },
             tooltip: {
                 trigger: 'axis',
-                axisPointer: { type: 'cross', lineStyle: { color: '#cbd5e1', width: 1 }, crossStyle: { color: '#cbd5e1' }, label: { backgroundColor: '#64748b' } },
-                backgroundColor: 'rgba(255,255,255,0.96)',
-                borderColor: '#e2e8f0',
-                borderWidth: 1,
+                axisPointer: { type: 'line', lineStyle: { color: '#cbd5e1', width: 1 }, label: { backgroundColor: '#64748b' } },
+                backgroundColor: 'rgba(255,255,255,0.96)', borderColor: '#e2e8f0', borderWidth: 1,
                 textStyle: { color: '#0f172a', fontSize: 12 },
                 formatter: function(params) {
+                    if (!params || !params.length) return '';
                     let html = '<div style="font-weight:600;margin-bottom:6px;font-size:13px">' + params[0].axisValue + '</div>';
                     params.forEach(p => {
                         if (p.value == null) return;
                         const dot = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + p.color + ';margin-right:6px;vertical-align:middle"></span>';
-                        html += '<div style="display:flex;justify-content:space-between;gap:20px;font-size:12px;line-height:1.6">';
-                        html += '<span>' + dot + p.seriesName + '</span>';
-                        html += '<span style="font-weight:600;font-variant-numeric:tabular-nums">' + (typeof p.value === 'number' ? (p.value % 1 ? p.value.toFixed(2) : p.value) : p.value) + '</span>';
-                        html += '</div>';
+                        html += '<div style="display:flex;justify-content:space-between;gap:20px;font-size:12px;line-height:1.6"><span>' + dot + p.seriesName + '</span><span style="font-weight:600;font-variant-numeric:tabular-nums">' + (typeof p.value === 'number' ? (p.value % 1 ? p.value.toFixed(2) : p.value) : p.value) + '</span></div>';
                     });
                     return html;
                 }
             },
-            grid: { left: 50, right: 50, top: 16, bottom: 32, containLabel: false },
-            xAxis: {
-                type: 'category',
-                boundaryGap: false,
-                data: labels,
-                axisLabel: { color: '#94a3b8', fontSize: 11, hideOverlap: true },
-                axisLine: { lineStyle: { color: '#e2e8f0' } },
-                axisTick: { show: false }
-            },
-            yAxis: [
-                {
-                    type: 'value',
-                    position: 'left',
-                    axisLabel: { color: '#94a3b8', fontSize: 11, formatter: v => v.toFixed(1) },
-                    splitLine: { lineStyle: { color: '#f1f5f9', type: 'dashed' } },
-                    min: 0, max: 1
-                },
-                {
-                    type: 'value',
-                    position: 'right',
-                    axisLabel: { color: '#94a3b8', fontSize: 11 },
-                    splitLine: { show: false },
-                    minInterval: 1,
-                    max: null
-                }
-            ],
-            dataZoom: [
-                { type: 'inside', throttle: 50 }
-            ],
-            series: seriesData
+            grid: grids,
+            xAxis: xAxes,
+            yAxis: yAxes,
+            dataZoom: [{ type: 'inside', xAxisIndex: axisIndices, throttle: 50 }],
+            series: allSeries
         };
+
+        // Graphic: drug name labels + lane separators
+        option.graphic = drugNames.map((name, i) => ({
+            type: 'text', left: 4, top: i * laneHeight + laneHeight / 2 - 6,
+            style: { text: name, fill: drugColors[name] || '#666', fontSize: 11, fontWeight: 600, fontFamily: 'Inter, -apple-system, sans-serif' },
+            z: 100
+        }));
+        for (let i = 1; i < numDrugs; i++) {
+            option.graphic.push({ type: 'line', left: 80, right: 50, shape: { x1: 0, y1: 0, x2: 2000, y2: 0 }, top: i * laneHeight, style: { stroke: '#e2e8f0', lineWidth: 0.5 }, z: 99 });
+        }
+        option.graphic.push({ type: 'line', left: 80, right: 50, shape: { x1: 0, y1: 0, x2: 2000, y2: 0 }, top: laneTotal, style: { stroke: '#cbd5e1', lineWidth: 1 }, z: 99 });
 
         chart.setOption(option);
 
@@ -509,7 +544,7 @@ private fun buildHtmlTemplate(
             chip.addEventListener('click', () => {
                 scaleSec.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
                 chip.classList.add('active');
-                option.yAxis[1].max = (v === 'Auto') ? null : Number(v);
+                option.yAxis[mainYIdx].max = (v === 'Auto') ? null : Number(v);
                 chart.setOption(option);
             });
             scaleSec.appendChild(chip);
