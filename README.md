@@ -18,16 +18,28 @@ Correlates epilepsy seizure frequency with medication dosage changes by pulling 
 
 ## Setup
 
+Configuration is split into two files:
+
+- **`config.env`** — non-secret settings (committed to git, edit freely)
+- **`.env`** — OAuth secrets (gitignored, never commit)
+
+Create your secrets file:
+
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` with your Google OAuth credentials and desired analysis window:
+Edit `.env` with your Google OAuth credentials:
+
+| Variable | Description |
+|---|---|
+| `GOOGLE_CLIENT_ID` | OAuth 2.0 client ID *(required)* |
+| `GOOGLE_CLIENT_SECRET` | OAuth 2.0 client secret *(required)* |
+
+Edit `config.env` to adjust the analysis window and calendar settings:
 
 | Variable | Description | Default |
 |---|---|---|
-| `GOOGLE_CLIENT_ID` | OAuth 2.0 client ID | *(required)* |
-| `GOOGLE_CLIENT_SECRET` | OAuth 2.0 client secret | *(required)* |
 | `ANALYSIS_START` | Start date | `2024-01-01` |
 | `ANALYSIS_END` | End date | `2026-01-15` |
 | `ROLLING_WINDOWS` | Comma-separated window sizes | `7,14,30` |
@@ -35,6 +47,7 @@ Edit `.env` with your Google OAuth credentials and desired analysis window:
 | `DRUG_COLOR_IDS` | Calendar colorIds for drug events | `2` |
 | `BIG_SEIZURE_COLOR_ID` | Calendar colorId for big seizures | `3` |
 | `SMALL_SEIZURE_COLOR_IDS` | Calendar colorIds for small seizures | *(uncolored)* |
+| `EXCLUDE_DRUGS` | Comma-separated drug names to hide | *(none)* |
 
 ## Run
 
@@ -76,7 +89,7 @@ Drug changes use the summary format:
 
 Examples: `💊 Lamictal 100-0-150`, `💊 Fycompa 8-0-8 and Lamictal 100-0-150`
 
-Seizures are distinguished by Google Calendar color ID (configurable in `.env`).
+Seizures are distinguished by Google Calendar color ID (configurable in `config.env`).
 
 ## Tech stack
 

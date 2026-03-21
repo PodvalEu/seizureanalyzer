@@ -6,6 +6,7 @@ RUN gradle --no-daemon installDist
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /workspace/build/install/seizureanalyzer /app
+COPY config.env .
 ENV CREDENTIALS_DIR=/data/tokens \
     CSV_OUT=/data/daily.csv \
     REPORT_HTML=/data/report.html \
