@@ -65,13 +65,14 @@ class App : CliktCommand(name = "seizureanalyzer") {
         val eventsCsvPath = writeEventsCsv(filteredEvents, tz, File(eventsOut), ::echo)
 
         val categorized = categorizeEvents(filteredEvents, tz, ::echo)
-        echo("Detected drugs: ${categorized.detectedDrugs.sorted().joinToString(", ")}")
+        val drugs = categorized.detectedDrugs.toList()  // already sorted (sortedSetOf)
+        echo("Detected drugs: ${drugs.joinToString(", ")}")
 
         val dailyRows = buildDailyRows(categorized, ANALYSIS_START, ANALYSIS_END)
         applyForwardRolling(dailyRows, ROLLING_WINDOWS)
 
-        writeDailyCsv(dailyRows, categorized.detectedDrugs.sorted(), File(csvOut))
-        val reportPath = writeHtmlReport(dailyRows, categorized.detectedDrugs.sorted(), File(reportHtml))
+        writeDailyCsv(dailyRows, drugs, File(csvOut))
+        val reportPath = writeHtmlReport(dailyRows, drugs, File(reportHtml))
         val summaryPath = writeChatGptSummary(dailyRows, categorized, File(summaryJsonOut))
 
         echo("Daily CSV: ${File(csvOut).absolutePath}")

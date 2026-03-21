@@ -30,6 +30,5 @@ internal fun resolveEventsJsonOut(template: String, runId: Long): String = when 
     template.contains("{runId}") -> template.replace("{runId}", runId.toString())
     template.contains(":timestamp:") -> template.replace(":timestamp:", runId.toString())
     template.contains("*") -> template.replace("*", runId.toString())
-    template == "/data/events.json" -> "/data/events-$runId.json"
     else -> template
 }

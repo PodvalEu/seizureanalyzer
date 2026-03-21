@@ -34,8 +34,11 @@ internal fun listAllEvents(
     } while (pageToken != null)
 }
 
+internal fun Event.resolveDate(tz: TimeZone): LocalDate? =
+    start?.toLocalDate(tz) ?: created?.toLocalDate(tz)
+
 internal fun eventDateWithinRange(event: Event, tz: TimeZone): Boolean {
-    val date = event.start?.toLocalDate(tz) ?: event.created?.toLocalDate(tz)
+    val date = event.resolveDate(tz)
     return date != null && date >= ANALYSIS_START && date <= ANALYSIS_END
 }
 

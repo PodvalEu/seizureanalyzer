@@ -1,7 +1,5 @@
 package seizureanalyzer.output
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.kotlinModule
 import com.google.api.services.calendar.model.Event
 import kotlinx.datetime.Instant
 import seizureanalyzer.ANALYSIS_END
@@ -13,7 +11,7 @@ import java.io.File
 
 internal fun writeEventsJson(events: List<Event>, runId: Long, outFile: File, echo: (String) -> Unit): String {
     outFile.parentFile?.mkdirs()
-    val mapper = ObjectMapper().registerModule(kotlinModule())
+    val mapper = JACKSON_MAPPER
 
     val payload = mapOf(
         "run_id" to runId,
@@ -46,7 +44,7 @@ internal fun writeChatGptSummary(
     categorized: CategorizedEvents,
     outFile: File,
 ): String {
-    val mapper = ObjectMapper().registerModule(kotlinModule())
+    val mapper = JACKSON_MAPPER
     outFile.parentFile?.mkdirs()
 
     val seizures = rows.map { row ->

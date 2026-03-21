@@ -1,10 +1,7 @@
 package seizureanalyzer.output
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.kotlinModule
 import seizureanalyzer.ANALYSIS_END
 import seizureanalyzer.ANALYSIS_START
-import seizureanalyzer.COLOR_PALETTE
 import seizureanalyzer.ROLLING_WINDOWS
 import seizureanalyzer.model.DailyRow
 import java.io.File
@@ -16,7 +13,7 @@ internal fun writeHtmlReport(
 ): File {
     val outFile = resolveReportHtmlFile(baseFile)
     outFile.parentFile?.mkdirs()
-    val mapper = ObjectMapper().registerModule(kotlinModule())
+    val mapper = JACKSON_MAPPER
 
     val labels = rows.map { it.date.toString() }
 

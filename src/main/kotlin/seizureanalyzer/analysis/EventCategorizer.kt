@@ -5,8 +5,9 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import seizureanalyzer.ANALYSIS_END
 import seizureanalyzer.ANALYSIS_START
+import seizureanalyzer.BIG_SEIZURE_COLOR_ID
 import seizureanalyzer.DRUG_COLOR_IDS
-import seizureanalyzer.calendar.toLocalDate
+import seizureanalyzer.calendar.resolveDate
 import seizureanalyzer.model.CategorizedEvents
 import seizureanalyzer.model.DrugChange
 import seizureanalyzer.parsing.parseDrugSummary
@@ -22,7 +23,7 @@ internal fun categorizeEvents(
     val bigSeizures = mutableMapOf<LocalDate, Int>()
 
     events.forEach { event ->
-        val eventDate = event.start?.toLocalDate(tz) ?: event.created?.toLocalDate(tz)
+        val eventDate = event.resolveDate(tz)
         if (eventDate == null || eventDate < ANALYSIS_START || eventDate > ANALYSIS_END) {
             return@forEach
         }
@@ -55,7 +56,7 @@ internal fun categorizeEvents(
                 smallSeizures[eventDate] = smallSeizures.getOrDefault(eventDate, 0) + 1
             }
 
-            "3" -> {
+            BIG_SEIZURE_COLOR_ID -> {
                 bigSeizures[eventDate] = bigSeizures.getOrDefault(eventDate, 0) + 1
             }
 
