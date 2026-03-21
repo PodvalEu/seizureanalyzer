@@ -15,8 +15,13 @@ internal fun writeHtmlReport(
 
     val labels = rows.map { it.date.toString() }
 
+    val rawDrugData = drugs.associateWith { drug ->
+        rows.map { row -> row.drugDosages[drug]?.total() }
+    }
+    val rawDrugDataJson = mapper.writeValueAsString(rawDrugData)
+
     val normalizedDrugData = drugs.associateWith { drug ->
-        val rawValues = rows.map { row -> row.drugDosages[drug]?.total() }
+        val rawValues = rawDrugData[drug]!!
         val maxValue = rawValues.filterNotNull().maxOrNull() ?: 0.0
         rawValues.map { value ->
             when {
@@ -122,7 +127,7 @@ internal fun writeHtmlReport(
 
     val html = buildHtmlTemplate(
         labelsJson, seriesJson, drugLegendJson, seizureGroupsJson,
-        legendSelectedJson, totalSmall, totalBig,
+        legendSelectedJson, rawDrugDataJson, totalSmall, totalBig,
     )
     outFile.writeText(html)
     return outFile
@@ -134,6 +139,7 @@ private fun buildHtmlTemplate(
     drugLegendJson: String,
     seizureGroupsJson: String,
     legendSelectedJson: String,
+    rawDrugDataJson: String,
     totalSmall: Int,
     totalBig: Int,
 ): String = """
@@ -312,6 +318,7 @@ private fun buildHtmlTemplate(
         /* ── Chart ── */
         .chart-wrap {
             padding: 12px 20px 20px;
+            position: relative;
         }
 
         #reportChart {
@@ -319,6 +326,32 @@ private fun buildHtmlTemplate(
             height: 75vh;
             min-height: 550px;
             max-height: 900px;
+        }
+
+        #crosshair {
+            position: absolute;
+            top: 0;
+            bottom: 32px;
+            width: 1px;
+            background: #94a3b8;
+            pointer-events: none;
+            display: none;
+            z-index: 50;
+        }
+
+        #custom-tooltip {
+            position: absolute;
+            pointer-events: none;
+            display: none;
+            z-index: 100;
+            background: rgba(255,255,255,0.96);
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #0f172a;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            white-space: nowrap;
         }
     </style>
 </head>
@@ -343,6 +376,8 @@ private fun buildHtmlTemplate(
 
     <!-- Chart -->
     <div class="chart-wrap">
+        <div id="crosshair"></div>
+        <div id="custom-tooltip"></div>
         <div id="reportChart"></div>
     </div>
 
@@ -352,6 +387,7 @@ private fun buildHtmlTemplate(
         const drugNames = $drugLegendJson;
         const seizureGroups = $seizureGroupsJson;
         const defaultHidden = $legendSelectedJson;
+        const rawDrugData = $rawDrugDataJson;
 
         const allNames = seriesData.map(s => s.name);
         seizureGroups.forEach(g => {
@@ -421,22 +457,7 @@ private fun buildHtmlTemplate(
         const option = {
             backgroundColor: 'transparent', animationDuration: 300,
             legend: { show: false },
-            tooltip: {
-                trigger: 'axis',
-                axisPointer: { type: 'line', lineStyle: { color: '#cbd5e1', width: 1 }, label: { backgroundColor: '#64748b' } },
-                backgroundColor: 'rgba(255,255,255,0.96)', borderColor: '#e2e8f0', borderWidth: 1,
-                textStyle: { color: '#0f172a', fontSize: 12 },
-                formatter: function(params) {
-                    if (!params || !params.length) return '';
-                    let html = '<div style="font-weight:600;margin-bottom:6px;font-size:13px">' + params[0].axisValue + '</div>';
-                    params.forEach(p => {
-                        if (p.value == null) return;
-                        const dot = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + p.color + ';margin-right:6px;vertical-align:middle"></span>';
-                        html += '<div style="display:flex;justify-content:space-between;gap:20px;font-size:12px;line-height:1.6"><span>' + dot + p.seriesName + '</span><span style="font-weight:600;font-variant-numeric:tabular-nums">' + (typeof p.value === 'number' ? (p.value % 1 ? p.value.toFixed(2) : p.value) : p.value) + '</span></div>';
-                    });
-                    return html;
-                }
-            },
+            tooltip: { show: false },
             grid: grids,
             xAxis: xAxes,
             yAxis: yAxes,
@@ -456,6 +477,82 @@ private fun buildHtmlTemplate(
         option.graphic.push({ type: 'line', left: 80, right: 50, shape: { x1: 0, y1: 0, x2: 2000, y2: 0 }, top: laneTotal, style: { stroke: '#cbd5e1', lineWidth: 1 }, z: 99 });
 
         chart.setOption(option);
+
+        // Custom crosshair + tooltip spanning all grids
+        const crosshair = document.getElementById('crosshair');
+        const tooltip = document.getElementById('custom-tooltip');
+        const chartEl = document.getElementById('reportChart');
+        const wrapEl = document.querySelector('.chart-wrap');
+
+        // Build lookup: seizure series raw data by name
+        const seizureData = {};
+        seizureSeriesArr.forEach(s => { seizureData[s.name] = s.data; });
+
+        function findDateIndex(mouseX) {
+            // Use the main x-axis to find the closest date index
+            for (let i = 0; i < labels.length; i++) {
+                const px = chart.convertToPixel({ xAxisIndex: mainXIdx }, labels[i]);
+                if (px >= mouseX) return i > 0 && (mouseX - chart.convertToPixel({ xAxisIndex: mainXIdx }, labels[i - 1])) < (px - mouseX) ? i - 1 : i;
+            }
+            return labels.length - 1;
+        }
+
+        function buildTooltipHtml(idx) {
+            let html = '<div style="font-weight:600;margin-bottom:6px;font-size:13px">' + labels[idx] + '</div>';
+            // Drug dosages
+            drugNames.forEach(name => {
+                if (!selected[name]) return;
+                const val = rawDrugData[name][idx];
+                if (val == null) return;
+                const color = drugColors[name] || '#999';
+                const dot = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + color + ';margin-right:6px;vertical-align:middle"></span>';
+                const display = val % 1 ? val.toFixed(1) : val;
+                html += '<div style="display:flex;justify-content:space-between;gap:20px;font-size:12px;line-height:1.6"><span>' + dot + name + '</span><span style="font-weight:600;font-variant-numeric:tabular-nums">' + display + ' mg</span></div>';
+            });
+            // Seizure counts
+            seizureSeriesArr.forEach(s => {
+                if (!selected[s.name]) return;
+                const val = s.data[idx];
+                if (val == null) return;
+                const color = s.itemStyle?.color || '#999';
+                const dot = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + color + ';margin-right:6px;vertical-align:middle"></span>';
+                html += '<div style="display:flex;justify-content:space-between;gap:20px;font-size:12px;line-height:1.6"><span>' + dot + s.name + '</span><span style="font-weight:600;font-variant-numeric:tabular-nums">' + val + '</span></div>';
+            });
+            return html;
+        }
+
+        chartEl.addEventListener('mousemove', (e) => {
+            const rect = chartEl.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const gridLeft = chart.convertToPixel({ xAxisIndex: mainXIdx }, labels[0]);
+            const gridRight = chart.convertToPixel({ xAxisIndex: mainXIdx }, labels[labels.length - 1]);
+            if (x >= gridLeft && x <= gridRight) {
+                crosshair.style.display = 'block';
+                crosshair.style.left = (x + 20) + 'px';
+
+                const idx = findDateIndex(x);
+                tooltip.innerHTML = buildTooltipHtml(idx);
+                tooltip.style.display = 'block';
+
+                // Position tooltip: to the right of crosshair, flip if near edge
+                const wrapRect = wrapEl.getBoundingClientRect();
+                const tipWidth = tooltip.offsetWidth;
+                const tipLeft = x + 20 + 12;
+                if (tipLeft + tipWidth > wrapRect.width) {
+                    tooltip.style.left = (x + 20 - tipWidth - 12) + 'px';
+                } else {
+                    tooltip.style.left = tipLeft + 'px';
+                }
+                tooltip.style.top = (e.clientY - rect.top - 20) + 'px';
+            } else {
+                crosshair.style.display = 'none';
+                tooltip.style.display = 'none';
+            }
+        });
+        chartEl.addEventListener('mouseleave', () => {
+            crosshair.style.display = 'none';
+            tooltip.style.display = 'none';
+        });
 
         // Apply default hidden state
         Object.keys(defaultHidden).forEach(name => {
