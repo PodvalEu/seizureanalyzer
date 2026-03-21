@@ -478,6 +478,38 @@ private fun buildHtmlTemplate(
 
         chart.setOption(option);
 
+        function rebuildLayout() {
+            let slot = 0;
+            drugNames.forEach((name, i) => {
+                if (selected[name]) {
+                    option.grid[i] = { left: 80, right: 50, top: slot * laneHeight, height: laneHeight - 4, borderColor: '#e2e8f0', borderWidth: 0 };
+                    option.series[i].data = drugSeriesArr[i].data;
+                    slot++;
+                } else {
+                    option.grid[i] = { left: 80, right: 50, top: 0, height: 0, borderWidth: 0 };
+                    option.series[i].data = [];
+                }
+            });
+            const newMainTop = slot * laneHeight + (slot > 0 ? 8 : 0);
+            option.grid[numDrugs] = Object.assign({}, option.grid[numDrugs], { top: newMainTop });
+
+            const graphics = [];
+            let visSlot = 0;
+            drugNames.forEach((name, i) => {
+                if (!selected[name]) return;
+                graphics.push({ type: 'text', left: 4, top: visSlot * laneHeight + laneHeight / 2 - 6, style: { text: name, fill: drugColors[name] || '#666', fontSize: 11, fontWeight: 600, fontFamily: 'Inter, -apple-system, sans-serif' }, z: 100 });
+                if (visSlot > 0) {
+                    graphics.push({ type: 'line', left: 80, right: 50, shape: { x1: 0, y1: 0, x2: 2000, y2: 0 }, top: visSlot * laneHeight, style: { stroke: '#e2e8f0', lineWidth: 0.5 }, z: 99 });
+                }
+                visSlot++;
+            });
+            if (visSlot > 0) {
+                graphics.push({ type: 'line', left: 80, right: 50, shape: { x1: 0, y1: 0, x2: 2000, y2: 0 }, top: visSlot * laneHeight, style: { stroke: '#cbd5e1', lineWidth: 1 }, z: 99 });
+            }
+            option.graphic = graphics;
+            chart.setOption(option, { replaceMerge: ['graphic'] });
+        }
+
         // Custom crosshair + tooltip spanning all grids
         const crosshair = document.getElementById('crosshair');
         const tooltip = document.getElementById('custom-tooltip');
@@ -599,6 +631,7 @@ private fun buildHtmlTemplate(
                 selected[name] = !selected[name];
                 chip.classList.toggle('off', !selected[name]);
                 chart.dispatchAction({ type: 'legendToggleSelect', name: name });
+                rebuildLayout();
             });
             drugSec.appendChild(chip);
         });
@@ -683,6 +716,7 @@ private fun buildHtmlTemplate(
                 }
             });
             ctrl.querySelectorAll('.chip:not([data-max])').forEach(el => el.classList.remove('off'));
+            rebuildLayout();
         });
         ctrl.appendChild(showBtn);
 
@@ -697,6 +731,7 @@ private fun buildHtmlTemplate(
                 }
             });
             ctrl.querySelectorAll('.chip:not([data-max])').forEach(el => el.classList.add('off'));
+            rebuildLayout();
         });
         ctrl.appendChild(hideBtn);
 
