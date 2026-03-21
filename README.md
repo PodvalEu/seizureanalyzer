@@ -20,21 +20,23 @@ Correlates epilepsy seizure frequency with medication dosage changes by pulling 
 
 Configuration is split into two files:
 
-- **`config.env`** — non-secret settings (committed to git, edit freely)
-- **`.env`** — OAuth secrets (gitignored, never commit)
+- **`config.env`** — non-secret settings (analysis window, output paths)
+- **`.env`** — secrets and personal settings (OAuth credentials, calendar name) — gitignored
 
-Create your secrets file:
+Create both from the provided templates:
 
 ```bash
+cp config.env.example config.env
 cp .env.example .env
 ```
 
-Edit `.env` with your Google OAuth credentials:
+Edit `.env` with your credentials and calendar name:
 
 | Variable | Description |
 |---|---|
 | `GOOGLE_CLIENT_ID` | OAuth 2.0 client ID *(required)* |
 | `GOOGLE_CLIENT_SECRET` | OAuth 2.0 client secret *(required)* |
+| `CALENDAR_NAME` | Google Calendar name *(required)* |
 
 Edit `config.env` to adjust the analysis window and calendar settings:
 
@@ -43,7 +45,6 @@ Edit `config.env` to adjust the analysis window and calendar settings:
 | `ANALYSIS_START` | Start date | `2024-01-01` |
 | `ANALYSIS_END` | End date | `2026-01-15` |
 | `ROLLING_WINDOWS` | Comma-separated window sizes | `7,14,30` |
-| `CALENDAR_NAME` | Google Calendar name | `My Calendar` |
 | `DRUG_COLOR_IDS` | Calendar colorIds for drug events | `2` |
 | `BIG_SEIZURE_COLOR_ID` | Calendar colorId for big seizures | `3` |
 | `SMALL_SEIZURE_COLOR_IDS` | Calendar colorIds for small seizures | *(uncolored)* |

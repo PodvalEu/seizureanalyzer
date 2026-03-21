@@ -9,6 +9,9 @@ build/
 # Environment
 .env
 
+# Context (AI assistant notes, may contain personal info)
+context/
+
 # Data (tokens, generated outputs)
 data/tokens/
 data/*.json

@@ -9,7 +9,7 @@ Track epilepsy seizures and medication dosages for a patient to:
 
 ## 2. Data Source
 
-All seizure and medication data is stored in **Google Calendar** ("My Calendar").
+All seizure and medication data is stored in a **Google Calendar** (configurable via `CALENDAR_NAME`).
 
 ### Authentication
 - OAuth2 with Google Calendar API (CALENDAR_READONLY scope)

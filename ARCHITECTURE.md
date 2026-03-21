@@ -2,7 +2,7 @@
 
 ## Original Implementation
 
-The original application (`~/Programming/Repositories/epilepsy-analyzer`) is a single-file Kotlin application (~950 lines in `Main.kt`).
+The original application was a single-file Kotlin application (~950 lines in `Main.kt`).
 
 ## Technology Stack
 

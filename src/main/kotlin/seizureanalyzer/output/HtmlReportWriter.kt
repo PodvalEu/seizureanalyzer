@@ -52,12 +52,12 @@ internal fun writeHtmlReport(
     }
 
     // Seizure series - only 30d visible by default
-    // Small = red tones, Big = purple/violet tones — clearly distinct within each window
+    // Big = bold red (dominant), Small = muted sage green (subdued background)
     data class SeizureStyle(val label: String, val smallColor: String, val bigColor: String, val defaultVisible: Boolean)
     val seizureStyles = mapOf(
-        7 to SeizureStyle("7d", "#f87171", "#a78bfa", false),
-        14 to SeizureStyle("14d", "#ef4444", "#8b5cf6", false),
-        30 to SeizureStyle("30d", "#dc2626", "#7c3aed", true),
+        7 to SeizureStyle("7d", "#a3be8c", "#ef4444", false),
+        14 to SeizureStyle("14d", "#8faa7b", "#dc2626", false),
+        30 to SeizureStyle("30d", "#7a966a", "#b91c1c", true),
     )
 
     val seizureSeries = Config.rollingWindows.flatMap { window ->
@@ -69,9 +69,9 @@ internal fun writeHtmlReport(
                 put("smooth", true)
                 put("showSymbol", false)
                 put("yAxisIndex", 1)
-                put("lineStyle", mapOf("width" to 2, "color" to style.smallColor))
+                put("lineStyle", mapOf("width" to 1, "color" to style.smallColor, "type" to "dashed"))
                 put("itemStyle", mapOf("color" to style.smallColor))
-                put("areaStyle", mapOf("opacity" to 0.06))
+                put("areaStyle", mapOf("opacity" to 0.03))
                 put("data", rows.map { it.getForwardSmall(window) })
                 if (!style.defaultVisible) put("selected", false)
             },
@@ -81,9 +81,9 @@ internal fun writeHtmlReport(
                 put("smooth", true)
                 put("showSymbol", false)
                 put("yAxisIndex", 1)
-                put("lineStyle", mapOf("width" to 2, "color" to style.bigColor))
+                put("lineStyle", mapOf("width" to 3, "color" to style.bigColor))
                 put("itemStyle", mapOf("color" to style.bigColor))
-                put("areaStyle", mapOf("opacity" to 0.06))
+                put("areaStyle", mapOf("opacity" to 0.25))
                 put("data", rows.map { it.getForwardBig(window) })
                 if (!style.defaultVisible) put("selected", false)
             },
