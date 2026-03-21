@@ -29,7 +29,7 @@ internal fun normalizeDrugName(rawName: String): String {
         lower.contains("ontozry") -> "Ontozry"
         lower.contains("topamax") -> "Topamax"
         lower.contains("zonegran") || lower.contains("zonegram") || lower.contains("zonegraran") -> "Zonegran"
-        lower.contains("diazepam") || lower.contains("received") -> "Diazepam"
+        lower.contains("diazepam") -> "Diazepam"
         lower.contains("magn") -> "Magnesium"
         lower.contains("vitamin d") -> "Vitamin D"
         lower.contains("viridikid") -> "Viridikid Multivitamin"

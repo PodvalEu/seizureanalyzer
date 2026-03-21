@@ -1,14 +1,8 @@
 package seizureanalyzer.parsing
 
-import seizureanalyzer.model.DoseSlot
 import seizureanalyzer.model.DrugDosage
 import seizureanalyzer.model.DrugParseResult
 import seizureanalyzer.model.ParsedDrugLine
-
-private val SINGLE_DOSE_PATTERN = Regex(
-    "^\\s*(?:[\\p{So}\\p{Sk}]|\uD83D\uDC8A)?\\s*(.+?)\\s+(\\d+(?:[.,]\\d+)?)(?:\\s*(?:mg|ml|drops))?(.*)$",
-    RegexOption.IGNORE_CASE,
-)
 
 private val WHITESPACE_RUN = Regex("\\s+")
 
@@ -27,12 +21,7 @@ internal fun parseDrugSummary(summary: String): DrugParseResult {
         .forEach { segment ->
             val match = DRUG_ENTRY_PATTERN.find(segment)
             if (match == null) {
-                val singleDose = parseSingleDose(segment)
-                if (singleDose != null) {
-                    matches += singleDose
-                } else {
-                    unmatched += segment.replace(WHITESPACE_RUN, " ")
-                }
+                unmatched += segment.replace(WHITESPACE_RUN, " ")
             } else {
                 val drugName = normalizeDrugName(match.groupValues[1])
                 val morning = match.groupValues[2].toDoubleValue()
@@ -43,33 +32,4 @@ internal fun parseDrugSummary(summary: String): DrugParseResult {
         }
 
     return DrugParseResult(matches, unmatched)
-}
-
-private fun parseSingleDose(segment: String): ParsedDrugLine? {
-    val match = SINGLE_DOSE_PATTERN.find(segment) ?: return null
-
-    val drugName = normalizeDrugName(match.groupValues[1])
-    val dose = match.groupValues[2].toDoubleValue()
-    val context = match.groupValues[3]
-    val slot = inferDoseSlot(segment + context + drugName)
-    val dosage = when (slot) {
-        DoseSlot.MORNING -> DrugDosage(dose, 0.0, 0.0)
-        DoseSlot.NOON -> DrugDosage(0.0, dose, 0.0)
-        DoseSlot.EVENING -> DrugDosage(0.0, 0.0, dose)
-    }
-    return ParsedDrugLine(drugName, dosage)
-}
-
-private fun inferDoseSlot(context: String): DoseSlot {
-    val ctx = context.lowercase()
-    return when {
-        ctx.contains("evening") || ctx.contains("night") || ctx.contains("pm") ||
-            ctx.contains("večer") || ctx.contains("vecer") || ctx.contains("večerni") ||
-            ctx.contains("20:00") || ctx.contains("21:00") || ctx.contains("received") -> DoseSlot.EVENING
-        ctx.contains("noon") || ctx.contains("midday") || ctx.contains("afternoon") ||
-            ctx.contains("odpoledne") || ctx.contains("12:00") || ctx.contains("13:00") -> DoseSlot.NOON
-        ctx.contains("morning") || ctx.contains("am") || ctx.contains("rano") ||
-            ctx.contains("ráno") || ctx.contains("dopoledne") -> DoseSlot.MORNING
-        else -> DoseSlot.MORNING
-    }
 }

@@ -6,5 +6,3 @@ data class DrugParseResult(
     val matches: List<ParsedDrugLine>,
     val unmatchedSegments: List<String>,
 )
-
-enum class DoseSlot { MORNING, NOON, EVENING }

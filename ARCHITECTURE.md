@@ -81,7 +81,6 @@ DailyRow(
 
 ParsedDrugLine(name: String, dosage: DrugDosage)
 DrugParseResult(matches: List<ParsedDrugLine>, unmatchedSegments: List<String>)
-DoseSlot { MORNING, NOON, EVENING }
 ```
 
 ## CLI Options

@@ -45,13 +45,6 @@ All seizure and medication data is stored in a **Google Calendar** (configurable
 - Multiple drugs per event separated by: "and", "+", ",", ";"
 - Regex handles emoji prefixes, diacritical marks, Unicode normalization
 
-### Single-Dose Pattern (Fallback)
-When the standard triple-dosage pattern doesn't match, attempts single-dose parsing with time-of-day inference from context keywords:
-- Morning: "morning", "am", "rano", "ráno", "dopoledne"
-- Noon: "noon", "midday", "afternoon", "odpoledne"
-- Evening: "evening", "night", "pm", "večer", "večerni"
-- Also detects specific times: "8pm", "20:00", "21:00", "12pm", etc.
-
 ### Known Drug Name Normalization
 | Raw Input Patterns | Normalized Name |
 |-------------------|-----------------|
@@ -60,7 +53,7 @@ When the standard triple-dosage pattern doesn't match, attempts single-dose pars
 | ontozry | Ontozry |
 | topamax | Topamax |
 | zonegran, zonegram, zonegraran | Zonegran |
-| diazepam, "received" | Diazepam |
+| diazepam | Diazepam |
 | magn* | Magnesium |
 | vitamin d | Vitamin D |
 | viridikid, viridian | Viridikid Multivitamin |
