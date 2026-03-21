@@ -3,10 +3,7 @@ package seizureanalyzer.analysis
 import com.google.api.services.calendar.model.Event
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
-import seizureanalyzer.ANALYSIS_END
-import seizureanalyzer.ANALYSIS_START
-import seizureanalyzer.BIG_SEIZURE_COLOR_ID
-import seizureanalyzer.DRUG_COLOR_IDS
+import seizureanalyzer.Config
 import seizureanalyzer.calendar.resolveDate
 import seizureanalyzer.model.CategorizedEvents
 import seizureanalyzer.model.DrugChange
@@ -24,12 +21,12 @@ internal fun categorizeEvents(
 
     events.forEach { event ->
         val eventDate = event.resolveDate(tz)
-        if (eventDate == null || eventDate < ANALYSIS_START || eventDate > ANALYSIS_END) {
+        if (eventDate == null || eventDate < Config.analysisStart || eventDate > Config.analysisEnd) {
             return@forEach
         }
 
-        when (event.colorId) {
-            in DRUG_COLOR_IDS -> {
+        when {
+            event.colorId in Config.drugColorIds -> {
                 val summary = event.summary.orEmpty()
                 val parseResult = parseDrugSummary(summary)
                 if (parseResult.matches.isEmpty()) {
@@ -52,11 +49,11 @@ internal fun categorizeEvents(
                 }
             }
 
-            null -> {
+            event.colorId in Config.smallSeizureColorIds -> {
                 smallSeizures[eventDate] = smallSeizures.getOrDefault(eventDate, 0) + 1
             }
 
-            BIG_SEIZURE_COLOR_ID -> {
+            event.colorId == Config.bigSeizureColorId -> {
                 bigSeizures[eventDate] = bigSeizures.getOrDefault(eventDate, 0) + 1
             }
 

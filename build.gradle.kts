@@ -21,6 +21,7 @@ dependencies {
     implementation("com.github.doyaaaaaken:kotlin-csv-jvm:1.10.0")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.17.1")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.1")
+    implementation("io.github.cdimascio:dotenv-kotlin:6.4.1")
 }
 
 application {

@@ -2,9 +2,7 @@ package seizureanalyzer.output
 
 import com.google.api.services.calendar.model.Event
 import kotlinx.datetime.Instant
-import seizureanalyzer.ANALYSIS_END
-import seizureanalyzer.ANALYSIS_START
-import seizureanalyzer.ROLLING_WINDOWS
+import seizureanalyzer.Config
 import seizureanalyzer.model.CategorizedEvents
 import seizureanalyzer.model.DailyRow
 import java.io.File
@@ -52,7 +50,7 @@ internal fun writeChatGptSummary(
             put("date", row.date.toString())
             put("small", row.smallSeizures)
             put("big", row.bigSeizures)
-            ROLLING_WINDOWS.forEach { window ->
+            Config.rollingWindows.forEach { window ->
                 put("small_forward_${window}d", row.getForwardSmall(window))
                 put("big_forward_${window}d", row.getForwardBig(window))
             }
@@ -76,7 +74,7 @@ internal fun writeChatGptSummary(
         put("total_big", rows.sumOf { it.bigSeizures })
         put("average_small_per_day", rows.map { it.smallSeizures }.average())
         put("average_big_per_day", rows.map { it.bigSeizures }.average())
-        ROLLING_WINDOWS.forEach { window ->
+        Config.rollingWindows.forEach { window ->
             put("max_small_forward_${window}d", rows.maxOfOrNull { it.getForwardSmall(window) } ?: 0)
             put("max_big_forward_${window}d", rows.maxOfOrNull { it.getForwardBig(window) } ?: 0)
         }
@@ -94,7 +92,7 @@ internal fun writeChatGptSummary(
     }
 
     val payload: Map<String, Any> = mapOf(
-        "analysis_window" to mapOf("start" to ANALYSIS_START.toString(), "end" to ANALYSIS_END.toString()),
+        "analysis_window" to mapOf("start" to Config.analysisStart.toString(), "end" to Config.analysisEnd.toString()),
         "seizure_rollup" to seizureRollup,
         "latest_drug_state" to latestDrugState,
         "daily_seizures" to seizures,

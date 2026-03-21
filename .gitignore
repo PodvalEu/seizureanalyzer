@@ -6,8 +6,10 @@ build/
 .idea/
 *.iml
 
-# Data (credentials, tokens, generated outputs)
-data/credentials.json
+# Environment
+.env
+
+# Data (tokens, generated outputs)
 data/tokens/
 data/*.json
 data/*.csv

@@ -3,7 +3,7 @@ package seizureanalyzer.output
 import com.google.api.services.calendar.model.Event
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import seizureanalyzer.ROLLING_WINDOWS
+import seizureanalyzer.Config
 import seizureanalyzer.calendar.toInstant
 import seizureanalyzer.model.DailyRow
 import seizureanalyzer.parsing.formatNumber
@@ -23,7 +23,7 @@ internal fun writeDailyCsv(rows: List<DailyRow>, drugs: List<String>, outFile: F
         }
         add("small_seizures")
         add("big_seizures")
-        ROLLING_WINDOWS.forEach { window ->
+        Config.rollingWindows.forEach { window ->
             add("small_seizures_forward_${window}d")
             add("big_seizures_forward_${window}d")
         }
@@ -43,7 +43,7 @@ internal fun writeDailyCsv(rows: List<DailyRow>, drugs: List<String>, outFile: F
             }
             values += row.smallSeizures.toString()
             values += row.bigSeizures.toString()
-            ROLLING_WINDOWS.forEach { window ->
+            Config.rollingWindows.forEach { window ->
                 values += row.getForwardSmall(window).toString()
                 values += row.getForwardBig(window).toString()
             }

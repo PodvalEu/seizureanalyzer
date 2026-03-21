@@ -26,25 +26,25 @@ import java.io.File
 class App : CliktCommand(name = "seizureanalyzer") {
     private val calendarIdOption by option("--calendar-id", help = "Calendar ID (or 'primary')")
     private val calendarName by option("--calendar-name", help = "Calendar display name to look up")
-        .default("My Calendar")
+        .default(Config.calendarName)
 
     private val credentialsDir by option("--credentials-dir", help = "Directory to store OAuth tokens")
-        .default("/data/tokens")
+        .default(Config.credentialsDir)
 
     private val csvOut by option("--csv-out", help = "Daily aggregate CSV file path")
-        .default("/data/daily.csv")
+        .default(Config.csvOut)
 
     private val reportHtml by option("--report-html", help = "Standalone HTML report output path")
-        .default("/data/report.html")
+        .default(Config.reportHtml)
 
     private val summaryJsonOut by option("--summary-json", help = "ChatGPT-friendly summary JSON output path")
-        .default("/data/summary.json")
+        .default(Config.summaryJsonOut)
 
     private val eventsOut by option("--events-out", help = "Raw events CSV output path")
-        .default("/data/seizure_events.csv")
+        .default(Config.eventsOut)
 
     private val eventsJsonOut by option("--events-json-out", help = "JSON file capturing every downloaded event")
-        .default("/data/events-{runId}.json")
+        .default(Config.eventsJsonOut)
 
     override fun run() {
         val httpTransport = GoogleNetHttpTransport.newTrustedTransport()
@@ -53,11 +53,11 @@ class App : CliktCommand(name = "seizureanalyzer") {
         val tz = TimeZone.currentSystemDefault()
         val calendarId = resolveCalendarId(service, calendarName, calendarIdOption, ::echo)
 
-        val timeMin = ANALYSIS_START.atStartOfDayIn(tz)
-        val timeMax = ANALYSIS_END.plus(1, DateTimeUnit.DAY).atStartOfDayIn(tz)
+        val timeMin = Config.analysisStart.atStartOfDayIn(tz)
+        val timeMax = Config.analysisEnd.plus(1, DateTimeUnit.DAY).atStartOfDayIn(tz)
 
         val allEvents = listAllEvents(service, calendarId, timeMin, timeMax).toList()
-        echo("Fetched ${allEvents.size} events between $ANALYSIS_START and $ANALYSIS_END")
+        echo("Fetched ${allEvents.size} events between ${Config.analysisStart} and ${Config.analysisEnd}")
 
         val runId = System.currentTimeMillis()
         val filteredEvents = allEvents.filter { eventDateWithinRange(it, tz) }
@@ -68,8 +68,8 @@ class App : CliktCommand(name = "seizureanalyzer") {
         val drugs = categorized.detectedDrugs.toList()  // already sorted (sortedSetOf)
         echo("Detected drugs: ${drugs.joinToString(", ")}")
 
-        val dailyRows = buildDailyRows(categorized, ANALYSIS_START, ANALYSIS_END)
-        applyForwardRolling(dailyRows, ROLLING_WINDOWS)
+        val dailyRows = buildDailyRows(categorized, Config.analysisStart, Config.analysisEnd)
+        applyForwardRolling(dailyRows, Config.rollingWindows)
 
         writeDailyCsv(dailyRows, drugs, File(csvOut))
         val reportPath = writeHtmlReport(dailyRows, drugs, File(reportHtml))

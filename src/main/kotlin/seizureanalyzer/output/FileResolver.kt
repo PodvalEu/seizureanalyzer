@@ -3,7 +3,7 @@ package seizureanalyzer.output
 import java.io.File
 
 internal fun resolveReportHtmlFile(baseFile: File): File {
-    val parent = baseFile.parentFile ?: File("/data")
+    val parent = baseFile.parentFile ?: File("data")
     parent.mkdirs()
 
     val name = baseFile.nameWithoutExtension

@@ -8,8 +8,7 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import seizureanalyzer.ANALYSIS_END
-import seizureanalyzer.ANALYSIS_START
+import seizureanalyzer.Config
 
 internal fun listAllEvents(
     calendar: Calendar,
@@ -39,7 +38,7 @@ internal fun Event.resolveDate(tz: TimeZone): LocalDate? =
 
 internal fun eventDateWithinRange(event: Event, tz: TimeZone): Boolean {
     val date = event.resolveDate(tz)
-    return date != null && date >= ANALYSIS_START && date <= ANALYSIS_END
+    return date != null && date >= Config.analysisStart && date <= Config.analysisEnd
 }
 
 internal fun DateTime.toLocalDate(tz: TimeZone): LocalDate =

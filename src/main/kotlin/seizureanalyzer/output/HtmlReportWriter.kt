@@ -1,8 +1,6 @@
 package seizureanalyzer.output
 
-import seizureanalyzer.ANALYSIS_END
-import seizureanalyzer.ANALYSIS_START
-import seizureanalyzer.ROLLING_WINDOWS
+import seizureanalyzer.Config
 import seizureanalyzer.model.DailyRow
 import java.io.File
 
@@ -57,7 +55,7 @@ internal fun writeHtmlReport(
         30 to SeizureStyle("30d", "#dc2626", "#7c3aed", true),
     )
 
-    val seizureSeries = ROLLING_WINDOWS.flatMap { window ->
+    val seizureSeries = Config.rollingWindows.flatMap { window ->
         val style = seizureStyles[window]!!
         listOf(
             buildMap {
@@ -105,7 +103,7 @@ internal fun writeHtmlReport(
     val drugLegendJson = mapper.writeValueAsString(drugs)
 
     // Seizure window groups: one toggle per window controls both small+big
-    val seizureWindowGroups = ROLLING_WINDOWS.map { window ->
+    val seizureWindowGroups = Config.rollingWindows.map { window ->
         val style = seizureStyles[window]!!
         mapOf(
             "label" to "Seizures ${style.label}",
@@ -329,7 +327,7 @@ private fun buildHtmlTemplate(
     <div class="topbar">
         <div class="topbar-brand">
             <h1>Seizure Analyzer</h1>
-            <span class="meta">${ANALYSIS_START} &ndash; ${ANALYSIS_END}</span>
+            <span class="meta">${Config.analysisStart} &ndash; ${Config.analysisEnd}</span>
         </div>
         <div class="stat">
             <strong>${totalSmall + totalBig}</strong> seizures

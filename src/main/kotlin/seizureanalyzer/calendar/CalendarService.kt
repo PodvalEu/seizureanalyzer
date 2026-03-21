@@ -8,20 +8,20 @@ import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.util.store.FileDataStoreFactory
 import com.google.api.services.calendar.Calendar
 import com.google.api.services.calendar.CalendarScopes
+import seizureanalyzer.Config
 import seizureanalyzer.JSON_FACTORY
 import java.io.File
-import java.io.InputStreamReader
 
 internal fun buildCalendarService(httpTransport: NetHttpTransport, credentialsDir: File): Calendar {
-    val clientSecretsStream = sequenceOf(
-        File("/data/credentials.json"),
-        File("data/credentials.json"),
-        File("credentials.json"),
-    ).firstOrNull { it.exists() }?.inputStream()
-        ?: object {}::class.java.getResourceAsStream("/credentials.json")
-        ?: error("Missing OAuth client credentials. Provide data/credentials.json or /data/credentials.json")
-
-    val clientSecrets = GoogleClientSecrets.load(JSON_FACTORY, InputStreamReader(clientSecretsStream))
+    val clientSecrets = GoogleClientSecrets().apply {
+        installed = GoogleClientSecrets.Details().apply {
+            clientId = Config.googleClientId
+            clientSecret = Config.googleClientSecret
+            authUri = "https://accounts.google.com/o/oauth2/auth"
+            tokenUri = "https://oauth2.googleapis.com/token"
+            redirectUris = listOf("http://localhost")
+        }
+    }
 
     val flow = GoogleAuthorizationCodeFlow.Builder(
         httpTransport,
@@ -33,7 +33,7 @@ internal fun buildCalendarService(httpTransport: NetHttpTransport, credentialsDi
         .setAccessType("offline")
         .build()
 
-    val receiver = LocalServerReceiver.Builder().setPort(8888).build()
+    val receiver = LocalServerReceiver.Builder().setPort(Config.oauthPort).build()
     val credential = AuthorizationCodeInstalledApp(flow, receiver).authorize("user")
 
     return Calendar.Builder(httpTransport, JSON_FACTORY, credential)
