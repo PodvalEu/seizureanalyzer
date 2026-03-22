@@ -11,6 +11,7 @@ import kotlinx.datetime.plus
 import seizureanalyzer.analysis.applyForwardRolling
 import seizureanalyzer.analysis.buildDailyRows
 import seizureanalyzer.analysis.categorizeEvents
+import seizureanalyzer.analysis.runAnalysis
 import seizureanalyzer.calendar.buildCalendarService
 import seizureanalyzer.calendar.eventDateWithinRange
 import seizureanalyzer.calendar.listAllEvents
@@ -18,6 +19,7 @@ import seizureanalyzer.calendar.resolveCalendarId
 import seizureanalyzer.output.resolveEventsJsonOut
 import seizureanalyzer.output.writeChatGptSummary
 import seizureanalyzer.output.writeDailyCsv
+import seizureanalyzer.output.writeLlmCsv
 import seizureanalyzer.output.writeEventsCsv
 import seizureanalyzer.output.writeEventsJson
 import seizureanalyzer.output.writeHtmlReport
@@ -71,11 +73,19 @@ class App : CliktCommand(name = "seizureanalyzer") {
         val dailyRows = buildDailyRows(categorized, Config.analysisStart, Config.analysisEnd)
         applyForwardRolling(dailyRows, Config.rollingWindows)
 
+        val analysis = runAnalysis(dailyRows, categorized)
+        echo("Analysis: ${analysis.drugChangeImpacts.size} drug change impacts, " +
+            "${analysis.regimenRanking.size} regimens, " +
+            "${analysis.monthlyTrend.size} months, " +
+            "${analysis.seizureFreeStreaks.size} streaks")
+
         writeDailyCsv(dailyRows, drugs, File(csvOut))
-        val reportPath = writeHtmlReport(dailyRows, drugs, File(reportHtml))
-        val summaryPath = writeChatGptSummary(dailyRows, categorized, File(summaryJsonOut))
+        writeLlmCsv(dailyRows, drugs, File(Config.llmCsvOut))
+        val reportPath = writeHtmlReport(dailyRows, drugs, categorized, analysis, File(reportHtml))
+        val summaryPath = writeChatGptSummary(dailyRows, categorized, analysis, File(summaryJsonOut))
 
         echo("Daily CSV: ${File(csvOut).absolutePath}")
+        echo("LLM CSV: ${File(Config.llmCsvOut).absolutePath}")
         echo("HTML report: ${reportPath.absolutePath}")
         echo("Summary JSON: $summaryPath")
         echo("Events CSV: $eventsCsvPath")

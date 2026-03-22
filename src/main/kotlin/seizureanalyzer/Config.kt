@@ -54,6 +54,7 @@ internal object Config {
 
     val credentialsDir: String = this["CREDENTIALS_DIR"] ?: "data/tokens"
     val csvOut: String = this["CSV_OUT"] ?: "data/daily.csv"
+    val llmCsvOut: String = this["LLM_CSV_OUT"] ?: "data/llm-export.csv"
     val reportHtml: String = this["REPORT_HTML"] ?: "data/report.html"
     val summaryJsonOut: String = this["SUMMARY_JSON"] ?: "data/summary.json"
     val eventsOut: String = this["EVENTS_OUT"] ?: "data/seizure_events.csv"

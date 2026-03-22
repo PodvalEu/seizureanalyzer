@@ -3,6 +3,7 @@ package seizureanalyzer.output
 import com.google.api.services.calendar.model.Event
 import kotlinx.datetime.Instant
 import seizureanalyzer.Config
+import seizureanalyzer.model.AnalysisResults
 import seizureanalyzer.model.CategorizedEvents
 import seizureanalyzer.model.DailyRow
 import java.io.File
@@ -40,6 +41,7 @@ internal fun writeEventsJson(events: List<Event>, runId: Long, outFile: File, ec
 internal fun writeChatGptSummary(
     rows: List<DailyRow>,
     categorized: CategorizedEvents,
+    analysis: AnalysisResults,
     outFile: File,
 ): String {
     val mapper = JACKSON_MAPPER
@@ -91,6 +93,74 @@ internal fun writeChatGptSummary(
         }
     }
 
+    val drugChangeImpacts = analysis.drugChangeImpacts.map { impact ->
+        buildMap<String, Any?> {
+            put("drug", impact.drug)
+            put("date", impact.date.toString())
+            put("dosage_before", impact.dosageBefore?.formatTriple())
+            put("dosage_after", impact.dosageAfter.formatTriple())
+            put("window_days", impact.windowDays)
+            put("avg_daily_seizures_before", impact.avgDailySeizuresBefore)
+            put("avg_daily_seizures_after", impact.avgDailySeizuresAfter)
+            put("change_percent", impact.changePercent)
+            put("confounded", impact.confounded)
+        }
+    }
+
+    val regimenRanking = analysis.regimenRanking.map { regimen ->
+        mapOf(
+            "dosages" to regimen.dosages,
+            "days" to regimen.days,
+            "total_small" to regimen.totalSmall,
+            "total_big" to regimen.totalBig,
+            "avg_daily_total" to regimen.avgDailyTotal,
+            "start_date" to regimen.startDate.toString(),
+            "end_date" to regimen.endDate.toString(),
+        )
+    }
+
+    val monthlyTrend = analysis.monthlyTrend.map { month ->
+        mapOf(
+            "year_month" to month.yearMonth,
+            "total_small" to month.totalSmall,
+            "total_big" to month.totalBig,
+            "days" to month.daysWithData,
+            "avg_daily_total" to month.avgDailyTotal,
+            "seizure_free_days" to month.seizureFreeDays,
+            "big_seizure_free_days" to month.bigSeizureFreeDays,
+        )
+    }
+
+    val streaks = analysis.seizureFreeStreaks.map { streak ->
+        mapOf(
+            "start_date" to streak.startDate.toString(),
+            "end_date" to streak.endDate.toString(),
+            "days" to streak.days,
+            "active_drugs" to streak.activeDrugs,
+            "big_seizure_free_only" to streak.bigOnly,
+        )
+    }
+
+    val correlations = analysis.drugCorrelations.map { corr ->
+        mapOf(
+            "drug" to corr.drug,
+            "pearson_r" to corr.pearsonR,
+            "days_on_drug" to corr.daysOnDrug,
+            "days_off_drug" to corr.daysOffDrug,
+            "avg_seizures_on_drug" to corr.avgSeizuresOnDrug,
+            "avg_seizures_off_drug" to corr.avgSeizuresOffDrug,
+        )
+    }
+
+    val lagCorrelations = analysis.lagCorrelations.map { lc ->
+        mapOf(
+            "drug" to lc.drug,
+            "lag_days" to lc.lagDays,
+            "pearson_r" to lc.pearsonR,
+            "sample_size" to lc.sampleSize,
+        )
+    }
+
     val payload: Map<String, Any> = mapOf(
         "analysis_window" to mapOf("start" to Config.analysisStart.toString(), "end" to Config.analysisEnd.toString()),
         "seizure_rollup" to seizureRollup,
@@ -98,6 +168,12 @@ internal fun writeChatGptSummary(
         "daily_seizures" to seizures,
         "drug_changes" to drugTimelines,
         "detected_drugs" to categorized.detectedDrugs.sorted(),
+        "drug_change_impacts" to drugChangeImpacts,
+        "regimen_ranking" to regimenRanking,
+        "monthly_trend" to monthlyTrend,
+        "seizure_free_streaks" to streaks,
+        "drug_correlations" to correlations,
+        "lag_correlations" to lagCorrelations,
         "run_metadata" to mapOf(
             "row_count" to rows.size,
             "drugs_tracked" to categorized.detectedDrugs.size,

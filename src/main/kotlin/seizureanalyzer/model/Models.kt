@@ -17,6 +17,77 @@ data class CategorizedEvents(
     val detectedDrugs: Set<String>,
 )
 
+// ── Analysis result models ──
+
+data class DrugChangeImpact(
+    val drug: String,
+    val date: LocalDate,
+    val dosageBefore: DrugDosage?,
+    val dosageAfter: DrugDosage,
+    val windowDays: Int,
+    val avgDailySeizuresBefore: Double,
+    val avgDailySeizuresAfter: Double,
+    val changePercent: Double?,
+    val confounded: Boolean,
+)
+
+data class RegimenStats(
+    val dosages: Map<String, Double>,
+    val days: Int,
+    val totalSmall: Int,
+    val totalBig: Int,
+    val avgDailySmall: Double,
+    val avgDailyBig: Double,
+    val avgDailyTotal: Double,
+    val startDate: LocalDate,
+    val endDate: LocalDate,
+)
+
+data class MonthlyStats(
+    val yearMonth: String,
+    val totalSmall: Int,
+    val totalBig: Int,
+    val daysWithData: Int,
+    val avgDailyTotal: Double,
+    val seizureFreeDays: Int,
+    val bigSeizureFreeDays: Int,
+)
+
+data class SeizureFreeStreak(
+    val startDate: LocalDate,
+    val endDate: LocalDate,
+    val days: Int,
+    val activeDrugs: Map<String, Double>,
+    val bigOnly: Boolean,
+)
+
+data class DrugCorrelation(
+    val drug: String,
+    val pearsonR: Double,
+    val daysOnDrug: Int,
+    val daysOffDrug: Int,
+    val avgSeizuresOnDrug: Double,
+    val avgSeizuresOffDrug: Double,
+)
+
+data class LagCorrelation(
+    val drug: String,
+    val lagDays: Int,
+    val pearsonR: Double,
+    val sampleSize: Int,
+)
+
+data class AnalysisResults(
+    val drugChangeImpacts: List<DrugChangeImpact>,
+    val regimenRanking: List<RegimenStats>,
+    val monthlyTrend: List<MonthlyStats>,
+    val seizureFreeStreaks: List<SeizureFreeStreak>,
+    val drugCorrelations: List<DrugCorrelation>,
+    val lagCorrelations: List<LagCorrelation>,
+)
+
+// ── Core data models ──
+
 data class DailyRow(
     val date: LocalDate,
     val drugDosages: Map<String, DrugDosage?>,
