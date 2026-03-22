@@ -6,6 +6,7 @@ import kotlinx.datetime.toLocalDateTime
 import seizureanalyzer.Config
 import seizureanalyzer.calendar.toInstant
 import seizureanalyzer.model.DailyRow
+import seizureanalyzer.parsing.extractHour
 import seizureanalyzer.parsing.formatNumber
 import seizureanalyzer.parsing.slugify
 import java.io.File
@@ -79,18 +80,21 @@ internal fun writeLlmCsv(rows: List<DailyRow>, drugs: List<String>, outFile: Fil
 internal fun writeEventsCsv(events: List<Event>, tz: TimeZone, outFile: File, echo: (String) -> Unit): String {
     outFile.parentFile?.mkdirs()
 
-    val headers = listOf("id", "summary", "start", "end", "color_id", "location", "description")
+    val headers = listOf("id", "summary", "start", "end", "color_id", "hour_of_day", "location", "description")
     com.github.doyaaaaaken.kotlincsv.dsl.csvWriter().open(outFile) {
         writeRow(headers)
         events.forEach { event ->
             val start = event.start?.toInstant()?.toLocalDateTime(tz)?.toString() ?: ""
             val end = event.end?.toInstant()?.toLocalDateTime(tz)?.toString() ?: ""
+            val isSeizure = event.colorId in Config.smallSeizureColorIds || event.colorId == Config.bigSeizureColorId
+            val hour = if (isSeizure) extractHour(event.summary.orEmpty()).hour?.toString() ?: "" else ""
             writeRow(
                 event.id.orEmpty(),
                 event.summary.orEmpty(),
                 start,
                 end,
                 event.colorId.orEmpty(),
+                hour,
                 event.location.orEmpty(),
                 event.description.orEmpty(),
             )
