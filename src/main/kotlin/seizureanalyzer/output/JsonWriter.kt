@@ -158,6 +158,7 @@ internal fun writeChatGptSummary(
             "lag_days" to lc.lagDays,
             "pearson_r" to lc.pearsonR,
             "sample_size" to lc.sampleSize,
+            "window_days" to lc.windowDays,
         )
     }
 

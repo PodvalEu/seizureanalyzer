@@ -75,6 +75,7 @@ data class LagCorrelation(
     val lagDays: Int,
     val pearsonR: Double,
     val sampleSize: Int,
+    val windowDays: Int,
 )
 
 data class AnalysisResults(

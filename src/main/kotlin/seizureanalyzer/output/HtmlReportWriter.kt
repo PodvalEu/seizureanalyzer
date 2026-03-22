@@ -210,6 +210,7 @@ internal fun writeHtmlReport(
             "lag" to lc.lagDays,
             "r" to lc.pearsonR,
             "n" to lc.sampleSize,
+            "w" to lc.windowDays,
         )
     })
 
@@ -674,10 +675,17 @@ private fun buildHtmlTemplate(
     <div id="tab-lag" class="tab-content">
         <div class="lag-content">
             <p class="note">
-                Medications don&rsquo;t work instantly. This analysis computes the Pearson correlation (r)
-                between each drug&rsquo;s daily dose and the 7-day seizure sum shifted by 0, 3, 7, 14, and 21 days.
-                A negative r means higher dose is associated with fewer seizures at that delay.
-                The lag with the strongest negative r suggests how long the drug takes to show its effect.
+                Medications don&rsquo;t work instantly &mdash; some take days or weeks to kick in.
+                This asks: &ldquo;If we gave a drug today, do seizures drop 3 days later? 7 days? 14 days?&rdquo;
+                For each drug and each delay, we take the dose on a given day and compare it to
+                the total number of seizures over a window starting at that delay.
+                The window size is different for each drug, matched to how long it takes to reach steady state
+                (e.g. 5 days for Orfiril, 21 days for Fycompa).
+                The strength of that link is measured as a score <b>r</b> (ranging from &minus;1 to +1).
+                <b style="color:#16a34a">Negative r (green)</b> = when the dose goes up, seizures tend to go down &mdash; the drug seems to help.
+                <b style="color:#dc2626">Positive r (red)</b> = seizures tend to go up with the dose &mdash; no benefit seen (or seizures were already rising when the dose was increased).
+                The delay with the strongest green value tells you roughly how long that drug takes to show its effect.
+                This is a statistical pattern, not proof of cause and effect.
             </p>
             <div id="lagChart"></div>
             <div id="lagTable"></div>
@@ -1144,7 +1152,7 @@ private fun buildHtmlTemplate(
         (function() {
             const el = document.getElementById('pCorr');
             if (correlations.length === 0) { el.innerHTML = '<p class="muted">No correlations computed.</p>'; return; }
-            let html = '<p class="note">Correlation between drug dosage and 7-day seizure count. Negative r = higher dose associated with fewer seizures. This is correlation, not causation.</p>';
+            let html = '<p class="note">How strongly does each drug\u2019s dose track with seizure counts over the following 7 days? The score <b>r</b> ranges from \u22121 to +1. <b style="color:#16a34a">Green (negative)</b> = higher dose, fewer seizures \u2014 the drug appears helpful. <b style="color:#dc2626">Red (positive)</b> = higher dose, more seizures \u2014 no benefit seen. Values near zero (grey) mean no clear link. This shows a pattern, not proof of cause and effect.</p>';
             html += '<table><tr><th>Drug</th><th>Pearson r</th><th>Days on</th><th>Days off</th><th>Avg seizures/day on</th><th>Avg seizures/day off</th></tr>';
             correlations.forEach(c => {
                 const cls = c.r < -0.1 ? 'good' : (c.r > 0.1 ? 'bad' : 'muted');
@@ -1241,7 +1249,7 @@ private fun buildHtmlTemplate(
             const el = document.getElementById('lagTable');
             if (lagCorrelations.length === 0) { el.innerHTML = '<p class="muted">No lag correlations computed.</p>'; return; }
 
-            let html = '<table><tr><th>Drug</th>';
+            let html = '<table><tr><th>Drug</th><th>Window</th>';
             lags.forEach(l => { html += '<th>' + l + 'd lag</th>'; });
             html += '<th>Best lag</th><th>Samples</th></tr>';
 
@@ -1251,6 +1259,7 @@ private fun buildHtmlTemplate(
                 entries.forEach(e => { if (e.r < best.r) best = e; });
 
                 html += '<tr><td><strong>' + drug + '</strong></td>';
+                html += '<td class="muted">' + entries[0].w + 'd</td>';
                 entries.forEach(e => {
                     const cls = e.r < -0.1 ? 'good' : (e.r > 0.1 ? 'bad' : 'muted');
                     const bold = e.lag === best.lag ? ' best' : '';
