@@ -56,9 +56,9 @@ internal fun writeLlmCsv(rows: List<DailyRow>, drugs: List<String>, outFile: Fil
     outFile.parentFile?.mkdirs()
     val headers = buildList {
         add("date")
-        drugs.forEach { add("${it.lowercase()}_dosage_mg_morning_noon_evening") }
         add("small_seizure_count")
         add("big_seizure_count")
+        drugs.forEach { add("${it.lowercase()}_dosage_mg_morning_noon_evening") }
     }
 
     com.github.doyaaaaaken.kotlincsv.dsl.csvWriter().open(outFile) {
@@ -66,11 +66,11 @@ internal fun writeLlmCsv(rows: List<DailyRow>, drugs: List<String>, outFile: Fil
         rows.forEach { row ->
             val values = mutableListOf<String>()
             values += row.date.toString()
+            values += row.smallSeizures.toString()
+            values += row.bigSeizures.toString()
             drugs.forEach { drug ->
                 values += (row.drugDosages[drug]?.formatTriple() ?: "")
             }
-            values += row.smallSeizures.toString()
-            values += row.bigSeizures.toString()
             writeRow(values)
         }
     }
