@@ -214,11 +214,30 @@ internal fun writeHtmlReport(
         )
     })
 
+    val cusumCurveJson = mapper.writeValueAsString(
+        seizureanalyzer.analysis.computeCusumCurve(rows).map { (date, value) ->
+            mapOf("date" to date.toString(), "cusum" to value)
+        }
+    )
+
+    val changePointsJson = mapper.writeValueAsString(analysis.changePoints.map { cp ->
+        mapOf(
+            "date" to cp.date.toString(),
+            "direction" to cp.direction.name,
+            "magnitude" to cp.magnitude,
+            "cusum" to cp.cumulativeSum,
+            "drugs" to cp.activeDrugs.entries.sortedBy { it.key }
+                .joinToString(", ") { "${it.key} ${it.value}" },
+            "drugChange" to cp.recentDrugChange,
+        )
+    })
+
     val html = buildHtmlTemplate(
         labelsJson, seriesJson, drugLegendJson, seizureGroupsJson,
         legendSelectedJson, rawDrugDataJson, totalSmall, totalBig,
         drugChangeMarksJson, impactsJson, regimensJson, monthlyJson,
         streaksJson, correlationsJson, lagCorrelationsJson,
+        cusumCurveJson, changePointsJson,
     )
     outFile.writeText(html)
     return outFile
@@ -240,6 +259,8 @@ private fun buildHtmlTemplate(
     streaksJson: String,
     correlationsJson: String,
     lagCorrelationsJson: String,
+    cusumCurveJson: String,
+    changePointsJson: String,
 ): String = """
 <!DOCTYPE html>
 <html lang="en">
@@ -572,7 +593,7 @@ private fun buildHtmlTemplate(
             line-height: 1.5;
         }
 
-        #lagChart {
+        #lagChart, #cusumChart {
             width: 100%;
             height: 400px;
             background: var(--surface);
@@ -636,6 +657,7 @@ private fun buildHtmlTemplate(
     <div class="tab-bar" id="tabBar">
         <button class="active" data-tab="timeline">Timeline</button>
         <button data-tab="lag">Lag Analysis</button>
+        <button data-tab="changepoints">Change Points</button>
     </div>
 
     <!-- Tab: Timeline -->
@@ -689,6 +711,24 @@ private fun buildHtmlTemplate(
             </p>
             <div id="lagChart"></div>
             <div id="lagTable"></div>
+        </div>
+    </div>
+
+    <!-- Tab: Change Points -->
+    <div id="tab-changepoints" class="tab-content">
+        <div class="lag-content">
+            <p class="note">
+                Instead of assuming seizures changed because a drug was adjusted on a specific date,
+                CUSUM (Cumulative Sum) analysis asks &ldquo;when did things <em>actually</em> get better or worse?&rdquo;
+                by looking at the seizure numbers themselves. It finds the exact dates where the seizure
+                pattern shifted &mdash; sometimes that lines up with a drug change, sometimes it reveals
+                something else was going on (illness, stress, sleep).
+                <b style="color:#16a34a">Green dots</b> = seizures improved.
+                <b style="color:#dc2626">Red dots</b> = seizures worsened.
+                Vertical dashed lines show drug change dates for cross-referencing.
+            </p>
+            <div id="cusumChart"></div>
+            <div id="cusumTable"></div>
         </div>
     </div>
 
@@ -1056,6 +1096,8 @@ private fun buildHtmlTemplate(
         const streaks = $streaksJson;
         const correlations = $correlationsJson;
         const lagCorrelations = $lagCorrelationsJson;
+        const cusumCurve = $cusumCurveJson;
+        const changePointsData = $changePointsJson;
 
         // ── Drug change markLines on main chart ──
         if (drugChangeMarks.length > 0) {
@@ -1167,6 +1209,7 @@ private fun buildHtmlTemplate(
 
         // ── Tab switching ──
         let lagChartInstance = null;
+        let cusumChartInstance = null;
         document.querySelectorAll('.tab-bar button').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
@@ -1181,6 +1224,10 @@ private fun buildHtmlTemplate(
                 if (btn.dataset.tab === 'lag') {
                     if (!lagChartInstance) initLagTab();
                     else lagChartInstance.resize();
+                }
+                if (btn.dataset.tab === 'changepoints') {
+                    if (!cusumChartInstance) initChangePointsTab();
+                    else cusumChartInstance.resize();
                 }
             });
         });
@@ -1268,6 +1315,113 @@ private fun buildHtmlTemplate(
                 const bestCls = best.r < -0.1 ? 'good' : 'muted';
                 html += '<td class="' + bestCls + ' best">' + best.lag + 'd (r=' + best.r.toFixed(3) + ')</td>';
                 html += '<td class="muted">' + entries[0].n + '</td></tr>';
+            });
+            html += '</table>';
+            el.innerHTML = html;
+        }
+
+        // ── Change Points tab ──
+        function initChangePointsTab() {
+            cusumChartInstance = echarts.init(document.getElementById('cusumChart'));
+
+            // Build drug change mark lines
+            const markLines = drugChangeMarks.map(m => ({
+                xAxis: m.date,
+                lineStyle: { color: m.color, width: 1, type: 'dashed', opacity: 0.6 },
+                label: { show: false },
+            }));
+
+            // Scatter data for change points
+            const decreaseData = [];
+            const increaseData = [];
+            changePointsData.forEach(cp => {
+                const item = [cp.date, cp.cusum, cp.magnitude, cp.drugs, cp.drugChange, cp.direction];
+                if (cp.direction === 'DECREASE') decreaseData.push(item);
+                else increaseData.push(item);
+            });
+
+            const series = [
+                {
+                    name: 'CUSUM',
+                    type: 'line',
+                    data: cusumCurve.map(d => [d.date, d.cusum]),
+                    smooth: true,
+                    showSymbol: false,
+                    lineStyle: { width: 2, color: '#3b82f6' },
+                    itemStyle: { color: '#3b82f6' },
+                    markLine: markLines.length > 0 ? { silent: true, symbol: 'none', data: markLines } : undefined,
+                },
+                {
+                    name: 'Improvement',
+                    type: 'scatter',
+                    data: decreaseData,
+                    symbolSize: 14,
+                    itemStyle: { color: '#16a34a' },
+                    z: 10,
+                },
+                {
+                    name: 'Worsening',
+                    type: 'scatter',
+                    data: increaseData,
+                    symbolSize: 14,
+                    itemStyle: { color: '#ef4444' },
+                    z: 10,
+                },
+            ];
+
+            cusumChartInstance.setOption({
+                tooltip: {
+                    trigger: 'item',
+                    formatter: function(params) {
+                        if (params.seriesType === 'line') {
+                            return '<b>' + params.value[0] + '</b><br/>CUSUM: ' + params.value[1].toFixed(1);
+                        }
+                        const d = params.value;
+                        let html = '<b>' + d[0] + '</b><br/>';
+                        html += 'Direction: <b style="color:' + (d[5] === 'DECREASE' ? '#16a34a' : '#ef4444') + '">';
+                        html += (d[5] === 'DECREASE' ? '▼ Improvement' : '▲ Worsening') + '</b><br/>';
+                        html += 'Magnitude: ' + d[2].toFixed(1) + '<br/>';
+                        html += 'Active drugs: ' + d[3] + '<br/>';
+                        if (d[4]) html += 'Nearest drug change: ' + d[4];
+                        return html;
+                    }
+                },
+                legend: { top: 8, textStyle: { fontSize: 12 } },
+                grid: { top: 50, left: 60, right: 30, bottom: 40 },
+                xAxis: {
+                    type: 'time',
+                    axisLabel: { fontSize: 11 },
+                },
+                yAxis: {
+                    type: 'value',
+                    name: 'Cumulative Sum',
+                    nameLocation: 'middle',
+                    nameGap: 48,
+                    axisLabel: { fontSize: 11 },
+                    splitLine: { lineStyle: { type: 'dashed', color: '#e2e8f0' } },
+                },
+                series: series,
+            });
+            window.addEventListener('resize', () => { if (cusumChartInstance) cusumChartInstance.resize(); });
+
+            // Table
+            const el = document.getElementById('cusumTable');
+            if (changePointsData.length === 0) {
+                el.innerHTML = '<p class="muted">No significant change points detected.</p>';
+                return;
+            }
+
+            let html = '<table><tr><th>Date</th><th>Direction</th><th>Magnitude</th><th>Active Drugs</th><th>Nearest Drug Change</th></tr>';
+            changePointsData.forEach(cp => {
+                const dirCls = cp.direction === 'DECREASE' ? 'good' : 'bad';
+                const arrow = cp.direction === 'DECREASE' ? '▼ Improvement' : '▲ Worsening';
+                html += '<tr>';
+                html += '<td>' + cp.date + '</td>';
+                html += '<td class="' + dirCls + '"><strong>' + arrow + '</strong></td>';
+                html += '<td>' + cp.magnitude.toFixed(1) + '</td>';
+                html += '<td>' + cp.drugs + '</td>';
+                html += '<td>' + (cp.drugChange || '<span class="muted">none nearby</span>') + '</td>';
+                html += '</tr>';
             });
             html += '</table>';
             el.innerHTML = html;

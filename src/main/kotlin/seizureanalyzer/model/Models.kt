@@ -78,6 +78,17 @@ data class LagCorrelation(
     val windowDays: Int,
 )
 
+enum class ChangeDirection { INCREASE, DECREASE }
+
+data class ChangePoint(
+    val date: LocalDate,
+    val direction: ChangeDirection,
+    val magnitude: Double,
+    val cumulativeSum: Double,
+    val activeDrugs: Map<String, Double>,
+    val recentDrugChange: String?,
+)
+
 data class AnalysisResults(
     val drugChangeImpacts: List<DrugChangeImpact>,
     val regimenRanking: List<RegimenStats>,
@@ -85,6 +96,7 @@ data class AnalysisResults(
     val seizureFreeStreaks: List<SeizureFreeStreak>,
     val drugCorrelations: List<DrugCorrelation>,
     val lagCorrelations: List<LagCorrelation>,
+    val changePoints: List<ChangePoint>,
 )
 
 // ── Core data models ──

@@ -162,6 +162,17 @@ internal fun writeChatGptSummary(
         )
     }
 
+    val changePoints = analysis.changePoints.map { cp ->
+        mapOf(
+            "date" to cp.date.toString(),
+            "direction" to cp.direction.name,
+            "magnitude" to cp.magnitude,
+            "cumulative_sum" to cp.cumulativeSum,
+            "active_drugs" to cp.activeDrugs,
+            "recent_drug_change" to cp.recentDrugChange,
+        )
+    }
+
     val payload: Map<String, Any> = mapOf(
         "analysis_window" to mapOf("start" to Config.analysisStart.toString(), "end" to Config.analysisEnd.toString()),
         "seizure_rollup" to seizureRollup,
@@ -175,6 +186,7 @@ internal fun writeChatGptSummary(
         "seizure_free_streaks" to streaks,
         "drug_correlations" to correlations,
         "lag_correlations" to lagCorrelations,
+        "change_points" to changePoints,
         "run_metadata" to mapOf(
             "row_count" to rows.size,
             "drugs_tracked" to categorized.detectedDrugs.size,

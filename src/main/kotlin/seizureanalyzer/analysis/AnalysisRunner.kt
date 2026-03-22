@@ -12,4 +12,5 @@ internal fun runAnalysis(rows: List<DailyRow>, categorized: CategorizedEvents): 
         seizureFreeStreaks = analyzeStreaks(rows),
         drugCorrelations = computeDrugCorrelations(rows),
         lagCorrelations = computeLagCorrelations(rows),
+        changePoints = detectChangePoints(rows, categorized),
     )
