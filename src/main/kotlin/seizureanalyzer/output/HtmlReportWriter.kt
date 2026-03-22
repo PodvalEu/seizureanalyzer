@@ -180,11 +180,34 @@ internal fun writeHtmlReport(
         )
     })
 
+    val volatilityJson = mapper.writeValueAsString(analysis.volatilityAnalysis.map { v ->
+        mapOf(
+            "dosages" to v.dosages.entries.sortedBy { it.key }
+                .joinToString(", ") { "${it.key} ${it.value}" },
+            "startDate" to v.startDate.toString(),
+            "endDate" to v.endDate.toString(),
+            "days" to v.days,
+            "avg" to v.avgDailySeizures,
+            "cv" to v.cv,
+            "di" to v.dispersionIndex,
+            "bursts" to v.bursts.map { b ->
+                mapOf(
+                    "start" to b.startDate.toString(),
+                    "end" to b.endDate.toString(),
+                    "days" to b.days,
+                    "seizures" to b.totalSeizures,
+                    "drugs" to b.activeDrugs.entries.sortedBy { it.key }
+                        .joinToString(", ") { "${it.key} ${it.value}" },
+                )
+            },
+        )
+    })
+
     val html = buildHtmlTemplate(
         labelsJson, seriesJson, drugLegendJson, seizureGroupsJson,
         legendSelectedJson, rawDrugDataJson, totalSmall, totalBig,
         lagCorrelationsJson, cusumCurveJson, changePointsJson,
-        seizureEventsJson,
+        seizureEventsJson, volatilityJson,
     )
     outFile.writeText(html)
     return outFile
@@ -203,6 +226,7 @@ private fun buildHtmlTemplate(
     cusumCurveJson: String,
     changePointsJson: String,
     seizureEventsJson: String,
+    volatilityJson: String,
 ): String = """
 <!DOCTYPE html>
 <html lang="en">
@@ -473,9 +497,18 @@ private fun buildHtmlTemplate(
             border-radius: var(--radius);
         }
 
-        #lagChart, #cusumChart {
+        #lagChart, #cusumChart, #volScatter {
             width: 100%;
             height: 400px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            margin-bottom: 24px;
+        }
+
+        #volTimeline {
+            width: 100%;
+            height: 120px;
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: var(--radius);
@@ -538,6 +571,7 @@ private fun buildHtmlTemplate(
         <button class="active" data-tab="timeline">Timeline</button>
         <button data-tab="lag">Lag Analysis</button>
         <button data-tab="changepoints">Change Points</button>
+        <button data-tab="volatility">Volatility</button>
     </div>
 
     <!-- Tab: Timeline -->
@@ -600,6 +634,27 @@ private fun buildHtmlTemplate(
             </p>
             <div id="cusumChart"></div>
             <div id="cusumTable"></div>
+        </div>
+    </div>
+
+    <!-- Tab: Volatility -->
+    <div id="tab-volatility" class="tab-content">
+        <div class="lag-content">
+            <p class="note">
+                Two drug regimens might both average 1 seizure per day, but one has steady 1-per-day
+                while the other has 0 for a week then 7 in one day. This tells them apart.
+                <b>CV</b> (coefficient of variation) measures how unpredictable seizures are &mdash;
+                lower is more stable.
+                <b>Dispersion</b> shows clustering: &gt;&thinsp;1 means seizures come in bursts,
+                &asymp;&thinsp;1 means random, &lt;&thinsp;1 means unusually regular.
+                The scatter plot puts each regimen on a map: <b style="color:#16a34a">bottom-left</b>
+                (few seizures, low volatility) is the sweet spot.
+                <b style="color:#dc2626">Red blocks</b> on the timeline below mark burst episodes &mdash;
+                clusters of unusually bad days.
+            </p>
+            <div id="volScatter"></div>
+            <div id="volTimeline"></div>
+            <div id="volTable"></div>
         </div>
     </div>
 
@@ -1044,10 +1099,13 @@ private fun buildHtmlTemplate(
         const lagCorrelations = $lagCorrelationsJson;
         const cusumCurve = $cusumCurveJson;
         const changePointsData = $changePointsJson;
+        const volatilityData = $volatilityJson;
 
         // ── Tab switching ──
         let lagChartInstance = null;
         let cusumChartInstance = null;
+        let volScatterInstance = null;
+        let volTimelineInstance = null;
         document.querySelectorAll('.tab-bar button').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
@@ -1065,6 +1123,10 @@ private fun buildHtmlTemplate(
                 if (btn.dataset.tab === 'changepoints') {
                     if (!cusumChartInstance) initChangePointsTab();
                     else cusumChartInstance.resize();
+                }
+                if (btn.dataset.tab === 'volatility') {
+                    if (!volScatterInstance) initVolatilityTab();
+                    else { volScatterInstance.resize(); if (volTimelineInstance) volTimelineInstance.resize(); }
                 }
             });
         });
@@ -1250,6 +1312,140 @@ private fun buildHtmlTemplate(
                 html += '<td>' + cp.magnitude.toFixed(1) + '</td>';
                 html += '<td>' + cp.drugs + '</td>';
                 html += '<td>' + (cp.drugChange || '<span class="muted">none nearby</span>') + '</td>';
+                html += '</tr>';
+            });
+            html += '</table>';
+            el.innerHTML = html;
+        }
+
+        // ── Volatility tab ──
+        function initVolatilityTab() {
+            const el = document.getElementById('volTable');
+            if (volatilityData.length === 0) {
+                el.innerHTML = '<p class="muted">No regimens long enough for volatility analysis.</p>';
+                return;
+            }
+
+            // Scatter plot: avg seizures vs CV, dot size = days
+            volScatterInstance = echarts.init(document.getElementById('volScatter'));
+            const scatterData = volatilityData.map((v, i) => ({
+                value: [v.avg, v.cv, v.days, v.dosages, v.startDate, v.endDate, v.di],
+                symbolSize: Math.max(8, Math.min(40, Math.sqrt(v.days) * 3)),
+            }));
+
+            volScatterInstance.setOption({
+                tooltip: {
+                    trigger: 'item',
+                    formatter: function(p) {
+                        const d = p.value;
+                        let html = '<b>' + d[3] + '</b><br/>';
+                        html += d[4] + ' — ' + d[5] + ' (' + d[2] + ' days)<br/>';
+                        html += 'Avg seizures/day: ' + d[0].toFixed(2) + '<br/>';
+                        html += 'CV: ' + d[1].toFixed(2) + '<br/>';
+                        html += 'Dispersion: ' + d[6].toFixed(2);
+                        return html;
+                    }
+                },
+                grid: { top: 40, left: 70, right: 30, bottom: 50 },
+                xAxis: {
+                    type: 'value',
+                    name: 'Avg daily seizures',
+                    nameLocation: 'middle',
+                    nameGap: 30,
+                    axisLabel: { fontSize: 11 },
+                    splitLine: { lineStyle: { type: 'dashed', color: '#e2e8f0' } },
+                },
+                yAxis: {
+                    type: 'value',
+                    name: 'Coefficient of Variation',
+                    nameLocation: 'middle',
+                    nameGap: 50,
+                    axisLabel: { fontSize: 11 },
+                    splitLine: { lineStyle: { type: 'dashed', color: '#e2e8f0' } },
+                },
+                visualMap: {
+                    show: false,
+                    dimension: 0,
+                    min: 0,
+                    max: Math.max(...volatilityData.map(v => v.avg), 1),
+                    inRange: { color: ['#16a34a', '#eab308', '#ef4444'] },
+                },
+                series: [{
+                    type: 'scatter',
+                    data: scatterData,
+                    emphasis: { itemStyle: { borderColor: '#000', borderWidth: 2 } },
+                }],
+            });
+            window.addEventListener('resize', () => { if (volScatterInstance) volScatterInstance.resize(); });
+
+            // Burst timeline: all bursts across all regimens
+            const allBursts = [];
+            volatilityData.forEach(v => {
+                v.bursts.forEach(b => allBursts.push(b));
+            });
+
+            if (allBursts.length > 0) {
+                volTimelineInstance = echarts.init(document.getElementById('volTimeline'));
+                const timelineData = allBursts.map(b => ({
+                    value: [b.start, b.end, b.days, b.seizures, b.drugs],
+                    itemStyle: { color: '#ef4444', opacity: 0.7 },
+                }));
+
+                volTimelineInstance.setOption({
+                    tooltip: {
+                        trigger: 'item',
+                        formatter: function(p) {
+                            const d = p.value;
+                            return '<b>Burst</b><br/>' + d[0] + ' — ' + d[1] +
+                                ' (' + d[2] + ' days)<br/>' +
+                                'Seizures: ' + d[3] + '<br/>' +
+                                'Active drugs: ' + d[4];
+                        }
+                    },
+                    title: { text: 'Burst Episodes', textStyle: { fontSize: 13, fontWeight: 500, color: '#64748b' }, left: 16, top: 8 },
+                    grid: { top: 40, left: 70, right: 30, bottom: 30 },
+                    xAxis: { type: 'time', axisLabel: { fontSize: 11 } },
+                    yAxis: {
+                        type: 'value', show: false, min: 0, max: 1,
+                    },
+                    series: [{
+                        type: 'custom',
+                        renderItem: function(params, api) {
+                            const start = api.coord([api.value(0), 0.5]);
+                            const end = api.coord([api.value(1), 0.5]);
+                            const height = api.size([0, 0.6])[1];
+                            return {
+                                type: 'rect',
+                                shape: {
+                                    x: start[0],
+                                    y: start[1] - height / 2,
+                                    width: Math.max(end[0] - start[0], 4),
+                                    height: height,
+                                },
+                                style: api.style(),
+                            };
+                        },
+                        encode: { x: [0, 1] },
+                        data: timelineData,
+                    }],
+                });
+                window.addEventListener('resize', () => { if (volTimelineInstance) volTimelineInstance.resize(); });
+            }
+
+            // Table
+            let html = '<table><tr><th>Regimen</th><th>Period</th><th>Days</th><th>Avg/day</th><th>CV</th><th>Dispersion</th><th>Bursts</th></tr>';
+            volatilityData.forEach(v => {
+                const cvCls = v.cv < 0.5 ? 'good' : (v.cv > 1.5 ? 'bad' : '');
+                const diCls = v.di < 1.0 ? 'good' : (v.di > 2.0 ? 'bad' : '');
+                const diLabel = v.di > 1.0 ? 'bursty' : (v.di < 0.8 ? 'regular' : 'random');
+                html += '<tr>';
+                html += '<td><strong>' + v.dosages + '</strong></td>';
+                html += '<td class="muted">' + v.startDate + ' — ' + v.endDate + '</td>';
+                html += '<td>' + v.days + '</td>';
+                html += '<td>' + v.avg.toFixed(2) + '</td>';
+                html += '<td class="' + cvCls + '">' + v.cv.toFixed(2) + '</td>';
+                html += '<td class="' + diCls + '">' + v.di.toFixed(2) + ' <span class="muted">(' + diLabel + ')</span></td>';
+                html += '<td>' + v.bursts.length + '</td>';
                 html += '</tr>';
             });
             html += '</table>';

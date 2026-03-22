@@ -105,6 +105,25 @@ data class ChangePoint(
     val recentDrugChange: String?,
 )
 
+data class Burst(
+    val startDate: LocalDate,
+    val endDate: LocalDate,
+    val days: Int,
+    val totalSeizures: Int,
+    val activeDrugs: Map<String, Double>,
+)
+
+data class VolatilityStats(
+    val dosages: Map<String, Double>,
+    val startDate: LocalDate,
+    val endDate: LocalDate,
+    val days: Int,
+    val avgDailySeizures: Double,
+    val cv: Double,
+    val dispersionIndex: Double,
+    val bursts: List<Burst>,
+)
+
 data class AnalysisResults(
     val drugChangeImpacts: List<DrugChangeImpact>,
     val regimenRanking: List<RegimenStats>,
@@ -113,6 +132,7 @@ data class AnalysisResults(
     val drugCorrelations: List<DrugCorrelation>,
     val lagCorrelations: List<LagCorrelation>,
     val changePoints: List<ChangePoint>,
+    val volatilityAnalysis: List<VolatilityStats>,
 )
 
 // ── Core data models ──

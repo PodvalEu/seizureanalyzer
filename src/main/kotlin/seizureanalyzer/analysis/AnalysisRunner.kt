@@ -13,4 +13,5 @@ internal fun runAnalysis(rows: List<DailyRow>, categorized: CategorizedEvents): 
         drugCorrelations = computeDrugCorrelations(rows),
         lagCorrelations = computeLagCorrelations(rows),
         changePoints = detectChangePoints(rows, categorized),
+        volatilityAnalysis = analyzeVolatility(rows),
     )

@@ -33,7 +33,7 @@ The HTML report uses ECharts and a tab-based layout. Each new heuristic gets its
 **Wire up:** Same pattern.
 **Visualization:** New tab "Cycles". Two ECharts **bar charts** side by side: (1) Day-of-week — 7 bars (Mon–Sun), Y = avg daily seizures. (2) Day-of-month — 31 bars (1–31), Y = avg daily seizures. Color the peak bar red and trough bar green. Show a subtitle with the chi-squared p-value and whether the pattern is statistically significant (p < 0.05) or not.
 
-## 4. Volatility / Clustering Analysis
+## ~~4. Volatility / Clustering Analysis~~ DONE
 **In plain English:** Two drug regimens might both average 1 seizure per day, but one has steady 1-per-day while the other has 0 for a week then 7 in one day. This tells them apart. It measures how predictable/unpredictable seizures are under each regimen, and flags "burst" episodes — clusters of bad days in a row — along with what drugs were active during each burst.
 **File:** `VolatilityAnalyzer.kt`
 **What it does:**
