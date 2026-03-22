@@ -6,6 +6,7 @@ import kotlinx.datetime.toLocalDateTime
 import seizureanalyzer.Config
 import seizureanalyzer.calendar.toInstant
 import seizureanalyzer.model.DailyRow
+import seizureanalyzer.model.SeizureEvent
 import seizureanalyzer.parsing.extractHour
 import seizureanalyzer.parsing.formatNumber
 import seizureanalyzer.parsing.slugify
@@ -53,12 +54,14 @@ internal fun writeDailyCsv(rows: List<DailyRow>, drugs: List<String>, outFile: F
     }
 }
 
-internal fun writeLlmCsv(rows: List<DailyRow>, drugs: List<String>, outFile: File) {
+internal fun writeLlmCsv(rows: List<DailyRow>, drugs: List<String>, seizureEvents: List<SeizureEvent>, outFile: File) {
     outFile.parentFile?.mkdirs()
+    val hoursByDate = seizureEvents.groupBy { it.date }
     val headers = buildList {
         add("date")
         add("small_seizure_count")
         add("big_seizure_count")
+        add("seizure_hours")
         drugs.forEach { add("${it.lowercase()}_dosage_mg_morning_noon_evening") }
     }
 
@@ -69,6 +72,10 @@ internal fun writeLlmCsv(rows: List<DailyRow>, drugs: List<String>, outFile: Fil
             values += row.date.toString()
             values += row.smallSeizures.toString()
             values += row.bigSeizures.toString()
+            val hours = hoursByDate[row.date]
+                ?.map { it.hour?.toString() ?: "N/A" }
+                ?.joinToString(",") ?: ""
+            values += hours
             drugs.forEach { drug ->
                 values += (row.drugDosages[drug]?.formatTriple() ?: "")
             }
