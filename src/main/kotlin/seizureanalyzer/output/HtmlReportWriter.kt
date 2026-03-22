@@ -584,13 +584,33 @@ private fun buildHtmlTemplate(
     <div id="tab-changepoints" class="tab-content">
         <div class="lag-content">
             <p class="note">
-                Instead of assuming seizures changed because a drug was adjusted on a specific date,
-                CUSUM (Cumulative Sum) analysis asks &ldquo;when did things <em>actually</em> get better or worse?&rdquo;
-                by looking at the seizure numbers themselves. It finds the exact dates where the seizure
-                pattern shifted &mdash; sometimes that lines up with a drug change, sometimes it reveals
-                something else was going on (illness, stress, sleep).
-                <b style="color:#16a34a">Green dots</b> = seizures improved.
-                <b style="color:#dc2626">Red dots</b> = seizures worsened.
+                <strong>What is this?</strong>
+                Imagine drawing a line that goes up on bad days (more seizures than average) and down
+                on good days (fewer than average). Over time, this line drifts &mdash; if seizures get
+                worse, it climbs; if they get better, it drops.
+                This chart shows that running total. The <b style="color:#16a34a">green dots ▼</b> mark
+                dates where things started getting noticeably <em>better</em>, and the
+                <b style="color:#dc2626">red dots ▲</b> mark dates where things started getting
+                noticeably <em>worse</em>.
+            </p>
+            <p class="note">
+                <strong>Why is it useful?</strong>
+                When a doctor changes a medication, it&rsquo;s tempting to assume that whatever
+                happened next was caused by that change. But sometimes seizures shift for other
+                reasons &mdash; illness, poor sleep, stress, or just random variation.
+                This analysis ignores the drug schedule entirely and looks <em>only</em> at the
+                seizure numbers to find when things truly changed.
+                It then checks: was there a drug change nearby? If yes, that drug change likely
+                played a role. If not, something else was going on.
+                The vertical dashed lines on the chart show drug change dates so you can
+                visually compare.
+            </p>
+            <p class="note">
+                <strong>How to read the table:</strong>
+                Each row is a detected turning point. &ldquo;Magnitude&rdquo; is how big the shift
+                was (bigger = more dramatic change). &ldquo;Active Drugs&rdquo; lists what was being
+                taken at that time. &ldquo;Nearest Drug Change&rdquo; shows the closest medication
+                adjustment &mdash; if blank, the shift happened without any recent drug change.
             </p>
             <div id="cusumChart"></div>
             <div id="cusumTable"></div>
