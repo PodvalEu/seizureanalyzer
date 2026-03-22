@@ -57,11 +57,11 @@ internal fun writeHtmlReport(
 
     // Seizure series - only 30d visible by default
     // Big = bold red (dominant), Small = muted sage green (subdued background)
-    data class SeizureStyle(val label: String, val smallColor: String, val bigColor: String, val defaultVisible: Boolean)
+    data class SeizureStyle(val label: String, val smallColor: String, val bigColor: String, val totalColor: String, val defaultVisible: Boolean)
     val seizureStyles = mapOf(
-        7 to SeizureStyle("7d", "#a3be8c", "#ef4444", false),
-        14 to SeizureStyle("14d", "#8faa7b", "#dc2626", false),
-        30 to SeizureStyle("30d", "#7a966a", "#b91c1c", true),
+        7 to SeizureStyle("7d", "#a3be8c", "#ef4444", "#6366f1", false),
+        14 to SeizureStyle("14d", "#8faa7b", "#dc2626", "#818cf8", false),
+        30 to SeizureStyle("30d", "#7a966a", "#b91c1c", "#4f46e5", true),
     )
 
     val seizureSeries = Config.rollingWindows.flatMap { window ->
@@ -73,9 +73,9 @@ internal fun writeHtmlReport(
                 put("smooth", true)
                 put("showSymbol", false)
                 put("yAxisIndex", 1)
-                put("lineStyle", mapOf("width" to 1, "color" to style.smallColor, "type" to "dashed"))
+                put("lineStyle", mapOf("width" to 2, "color" to style.smallColor, "type" to "dashed"))
                 put("itemStyle", mapOf("color" to style.smallColor))
-                put("areaStyle", mapOf("opacity" to 0.03))
+                put("areaStyle", mapOf("opacity" to 0.06))
                 put("data", rows.map { it.getForwardSmall(window) })
                 if (!style.defaultVisible) put("selected", false)
             },
@@ -89,6 +89,17 @@ internal fun writeHtmlReport(
                 put("itemStyle", mapOf("color" to style.bigColor))
                 put("areaStyle", mapOf("opacity" to 0.25))
                 put("data", rows.map { it.getForwardBig(window) })
+                if (!style.defaultVisible) put("selected", false)
+            },
+            buildMap {
+                put("name", "All seizures ${style.label}")
+                put("type", "line")
+                put("smooth", true)
+                put("showSymbol", false)
+                put("yAxisIndex", 1)
+                put("lineStyle", mapOf("width" to 1, "color" to style.totalColor, "type" to "dotted", "opacity" to 0.4))
+                put("itemStyle", mapOf("color" to style.totalColor))
+                put("data", rows.map { it.getForwardSmall(window) + it.getForwardBig(window) })
                 if (!style.defaultVisible) put("selected", false)
             },
         )
@@ -111,15 +122,17 @@ internal fun writeHtmlReport(
     // Drug legend names for grouped legend
     val drugLegendJson = mapper.writeValueAsString(drugs)
 
-    // Seizure window groups: one toggle per window controls both small+big
+    // Seizure window groups: one toggle per window controls small+big+total
     val seizureWindowGroups = Config.rollingWindows.map { window ->
         val style = seizureStyles[window]!!
         mapOf(
             "label" to "Seizures ${style.label}",
             "smallName" to "Small seizures ${style.label}",
             "bigName" to "Big seizures ${style.label}",
+            "totalName" to "All seizures ${style.label}",
             "smallColor" to style.smallColor,
             "bigColor" to style.bigColor,
+            "totalColor" to style.totalColor,
             "defaultVisible" to style.defaultVisible,
         )
     }
@@ -129,80 +142,6 @@ internal fun writeHtmlReport(
     val totalSmall = rows.sumOf { it.smallSeizures }
     val totalBig = rows.sumOf { it.bigSeizures }
 
-    // Drug change events for markLine annotations
-    val drugColorMap = drugs.mapIndexed { index, drug ->
-        drug to drugColors[index % drugColors.size]
-    }.toMap()
-    val drugChangeMarks = categorized.drugChanges.flatMap { (drug, changes) ->
-        changes.map { change ->
-            mapOf(
-                "date" to change.date.toString(),
-                "drug" to drug,
-                "color" to (drugColorMap[drug] ?: "#999"),
-                "label" to "${drug} ${change.dosage.formatTriple()}",
-            )
-        }
-    }.sortedBy { it["date"] }
-    val drugChangeMarksJson = mapper.writeValueAsString(drugChangeMarks)
-
-    // Analysis data for tables
-    val impactsJson = mapper.writeValueAsString(analysis.drugChangeImpacts.map { impact ->
-        mapOf(
-            "drug" to impact.drug,
-            "date" to impact.date.toString(),
-            "dosageBefore" to impact.dosageBefore?.formatTriple(),
-            "dosageAfter" to impact.dosageAfter.formatTriple(),
-            "avgBefore" to impact.avgDailySeizuresBefore,
-            "avgAfter" to impact.avgDailySeizuresAfter,
-            "changePct" to impact.changePercent,
-            "confounded" to impact.confounded,
-        )
-    })
-
-    val regimensJson = mapper.writeValueAsString(analysis.regimenRanking.map { regimen ->
-        mapOf(
-            "dosages" to regimen.dosages.entries.sortedBy { it.key }
-                .joinToString(", ") { "${it.key} ${it.value}" },
-            "days" to regimen.days,
-            "totalSmall" to regimen.totalSmall,
-            "totalBig" to regimen.totalBig,
-            "avgDaily" to regimen.avgDailyTotal,
-            "dates" to "${regimen.startDate} \u2013 ${regimen.endDate}",
-        )
-    })
-
-    val monthlyJson = mapper.writeValueAsString(analysis.monthlyTrend.map { month ->
-        mapOf(
-            "month" to month.yearMonth,
-            "small" to month.totalSmall,
-            "big" to month.totalBig,
-            "days" to month.daysWithData,
-            "avgDaily" to month.avgDailyTotal,
-            "seizureFreeDays" to month.seizureFreeDays,
-        )
-    })
-
-    val streaksJson = mapper.writeValueAsString(analysis.seizureFreeStreaks.map { streak ->
-        mapOf(
-            "start" to streak.startDate.toString(),
-            "end" to streak.endDate.toString(),
-            "days" to streak.days,
-            "drugs" to streak.activeDrugs.entries.sortedBy { it.key }
-                .joinToString(", ") { "${it.key} ${it.value}" },
-            "bigOnly" to streak.bigOnly,
-        )
-    })
-
-    val correlationsJson = mapper.writeValueAsString(analysis.drugCorrelations.map { corr ->
-        mapOf(
-            "drug" to corr.drug,
-            "r" to corr.pearsonR,
-            "daysOn" to corr.daysOnDrug,
-            "daysOff" to corr.daysOffDrug,
-            "avgOn" to corr.avgSeizuresOnDrug,
-            "avgOff" to corr.avgSeizuresOffDrug,
-        )
-    })
 
     val lagCorrelationsJson = mapper.writeValueAsString(analysis.lagCorrelations.map { lc ->
         mapOf(
@@ -235,9 +174,7 @@ internal fun writeHtmlReport(
     val html = buildHtmlTemplate(
         labelsJson, seriesJson, drugLegendJson, seizureGroupsJson,
         legendSelectedJson, rawDrugDataJson, totalSmall, totalBig,
-        drugChangeMarksJson, impactsJson, regimensJson, monthlyJson,
-        streaksJson, correlationsJson, lagCorrelationsJson,
-        cusumCurveJson, changePointsJson,
+        lagCorrelationsJson, cusumCurveJson, changePointsJson,
     )
     outFile.writeText(html)
     return outFile
@@ -252,12 +189,6 @@ private fun buildHtmlTemplate(
     rawDrugDataJson: String,
     totalSmall: Int,
     totalBig: Int,
-    drugChangeMarksJson: String,
-    impactsJson: String,
-    regimensJson: String,
-    monthlyJson: String,
-    streaksJson: String,
-    correlationsJson: String,
     lagCorrelationsJson: String,
     cusumCurveJson: String,
     changePointsJson: String,
@@ -473,82 +404,6 @@ private fun buildHtmlTemplate(
             white-space: nowrap;
         }
 
-        /* ── Analysis section ── */
-        .analysis { padding: 0 20px 40px; }
-
-        .analysis h2 {
-            font-size: 14px;
-            font-weight: 700;
-            margin: 24px 0 8px;
-            color: var(--text);
-            cursor: pointer;
-            user-select: none;
-        }
-
-        .analysis h2::before {
-            content: '\25B6';
-            display: inline-block;
-            font-size: 10px;
-            margin-right: 6px;
-            transition: transform 0.15s;
-        }
-
-        .analysis h2.open::before { transform: rotate(90deg); }
-
-        .analysis .panel { display: none; }
-        .analysis .panel.open { display: block; }
-
-        .analysis table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 12px;
-            margin: 4px 0 16px;
-        }
-
-        .analysis th {
-            text-align: left;
-            font-weight: 600;
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            color: var(--text-muted);
-            padding: 6px 10px;
-            border-bottom: 2px solid var(--border);
-        }
-
-        .analysis td {
-            padding: 5px 10px;
-            border-bottom: 1px solid #f1f5f9;
-            font-variant-numeric: tabular-nums;
-        }
-
-        .analysis tr:hover td { background: #f8fafc; }
-
-        .analysis .good { color: #16a34a; }
-        .analysis .bad { color: #dc2626; }
-        .analysis .muted { color: var(--text-muted); }
-        .analysis .tag {
-            display: inline-block;
-            font-size: 10px;
-            padding: 1px 5px;
-            border-radius: 3px;
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        #monthlyChart {
-            width: 100%;
-            height: 200px;
-            margin: 8px 0 16px;
-        }
-
-        .analysis .note {
-            font-size: 11px;
-            color: var(--text-muted);
-            font-style: italic;
-            margin: 4px 0 12px;
-        }
-
         /* ── Tab bar ── */
         .tab-bar {
             display: flex;
@@ -672,25 +527,6 @@ private fun buildHtmlTemplate(
             <div id="reportChart"></div>
         </div>
 
-        <!-- Analysis -->
-        <div class="analysis">
-            <h2 id="hMonthly" class="open">Monthly Trend</h2>
-            <div id="pMonthly" class="panel open">
-                <div id="monthlyChart"></div>
-            </div>
-
-            <h2 id="hRegimens">Medication Regimen Ranking</h2>
-            <div id="pRegimens" class="panel"></div>
-
-            <h2 id="hImpacts">Drug Change Impact</h2>
-            <div id="pImpacts" class="panel"></div>
-
-            <h2 id="hStreaks">Seizure-Free Streaks</h2>
-            <div id="pStreaks" class="panel"></div>
-
-            <h2 id="hCorr">Drug Correlation Signals</h2>
-            <div id="pCorr" class="panel"></div>
-        </div>
     </div>
 
     <!-- Tab: Lag Analysis -->
@@ -725,7 +561,6 @@ private fun buildHtmlTemplate(
                 something else was going on (illness, stress, sleep).
                 <b style="color:#16a34a">Green dots</b> = seizures improved.
                 <b style="color:#dc2626">Red dots</b> = seizures worsened.
-                Vertical dashed lines show drug change dates for cross-referencing.
             </p>
             <div id="cusumChart"></div>
             <div id="cusumTable"></div>
@@ -744,6 +579,7 @@ private fun buildHtmlTemplate(
         seizureGroups.forEach(g => {
             if (!allNames.includes(g.smallName)) allNames.push(g.smallName);
             if (!allNames.includes(g.bigName)) allNames.push(g.bigName);
+            if (!allNames.includes(g.totalName)) allNames.push(g.totalName);
         });
 
         const selected = {};
@@ -1005,9 +841,11 @@ private fun buildHtmlTemplate(
                 const nowVisible = !selected[g.smallName];
                 selected[g.smallName] = nowVisible;
                 selected[g.bigName] = nowVisible;
+                selected[g.totalName] = nowVisible;
                 chip.classList.toggle('off', !nowVisible);
                 chart.dispatchAction({ type: 'legendToggleSelect', name: g.smallName });
                 chart.dispatchAction({ type: 'legendToggleSelect', name: g.bigName });
+                chart.dispatchAction({ type: 'legendToggleSelect', name: g.totalName });
             });
             seizSec.appendChild(chip);
         });
@@ -1086,126 +924,11 @@ private fun buildHtmlTemplate(
         });
         ctrl.appendChild(hideBtn);
 
-        window.addEventListener('resize', () => { chart.resize(); if (monthlyChart) monthlyChart.resize(); });
+        window.addEventListener('resize', () => { chart.resize(); });
 
-        // ── Analysis data ──
-        const drugChangeMarks = $drugChangeMarksJson;
-        const impacts = $impactsJson;
-        const regimens = $regimensJson;
-        const monthly = $monthlyJson;
-        const streaks = $streaksJson;
-        const correlations = $correlationsJson;
         const lagCorrelations = $lagCorrelationsJson;
         const cusumCurve = $cusumCurveJson;
         const changePointsData = $changePointsJson;
-
-        // ── Drug change markLines on main chart ──
-        if (drugChangeMarks.length > 0) {
-            const markData = drugChangeMarks.map(m => ({
-                xAxis: m.date,
-                lineStyle: { color: m.color, width: 1, type: 'dotted', opacity: 0.5 },
-                label: { show: false }
-            }));
-            // Add markLine to last seizure series (so it renders on the main grid)
-            const lastSeizIdx = allSeries.length - 1;
-            if (!option.series[lastSeizIdx].markLine) {
-                option.series[lastSeizIdx].markLine = { silent: true, symbol: 'none', data: markData };
-            }
-            chart.setOption(option);
-        }
-
-        // ── Collapsible panels ──
-        document.querySelectorAll('.analysis h2').forEach(h => {
-            h.addEventListener('click', () => {
-                h.classList.toggle('open');
-                const panel = h.nextElementSibling;
-                panel.classList.toggle('open');
-            });
-        });
-
-        // ── Monthly trend bar chart ──
-        const monthlyChart = echarts.init(document.getElementById('monthlyChart'));
-        monthlyChart.setOption({
-            backgroundColor: 'transparent',
-            tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-            grid: { left: 50, right: 20, top: 10, bottom: 30 },
-            xAxis: { type: 'category', data: monthly.map(m => m.month), axisLabel: { fontSize: 10, color: '#94a3b8', rotate: 45 }, axisTick: { show: false }, axisLine: { lineStyle: { color: '#e2e8f0' } } },
-            yAxis: { type: 'value', axisLabel: { fontSize: 10, color: '#94a3b8' }, splitLine: { lineStyle: { color: '#f1f5f9', type: 'dashed' } }, minInterval: 1 },
-            series: [
-                { name: 'Big', type: 'bar', stack: 'seizures', data: monthly.map(m => m.big), itemStyle: { color: '#ef4444' }, barMaxWidth: 20 },
-                { name: 'Small', type: 'bar', stack: 'seizures', data: monthly.map(m => m.small), itemStyle: { color: '#a3be8c' }, barMaxWidth: 20 },
-            ]
-        });
-
-        // ── Regimen ranking table ──
-        (function() {
-            const el = document.getElementById('pRegimens');
-            if (regimens.length === 0) { el.innerHTML = '<p class="muted">No regimens found (minimum 7 days).</p>'; return; }
-            let html = '<table><tr><th>#</th><th>Medications</th><th>Days</th><th>Avg/day</th><th>Small</th><th>Big</th><th>Period</th></tr>';
-            regimens.forEach((r, i) => {
-                const cls = i < 3 ? ' class="good"' : (i >= regimens.length - 3 ? ' class="bad"' : '');
-                html += '<tr><td>' + (i + 1) + '</td><td>' + r.dosages + '</td><td>' + r.days + '</td>';
-                html += '<td' + cls + '>' + r.avgDaily.toFixed(2) + '</td>';
-                html += '<td>' + r.totalSmall + '</td><td>' + r.totalBig + '</td>';
-                html += '<td class="muted">' + r.dates + '</td></tr>';
-            });
-            html += '</table>';
-            el.innerHTML = html;
-        })();
-
-        // ── Drug change impact table ──
-        (function() {
-            const el = document.getElementById('pImpacts');
-            if (impacts.length === 0) { el.innerHTML = '<p class="muted">No drug changes found.</p>'; return; }
-            let html = '<p class="note">14-day window: average daily seizures before vs after each dosage change.</p>';
-            html += '<table><tr><th>Date</th><th>Drug</th><th>Before</th><th>After</th><th>Avg/day before</th><th>Avg/day after</th><th>Change</th><th></th></tr>';
-            impacts.forEach(im => {
-                const pct = im.changePct != null ? im.changePct.toFixed(0) + '%' : 'N/A';
-                const cls = im.changePct != null ? (im.changePct < -5 ? 'good' : (im.changePct > 5 ? 'bad' : 'muted')) : 'muted';
-                const arrow = im.changePct != null ? (im.changePct < -5 ? '\u2193' : (im.changePct > 5 ? '\u2191' : '\u2194')) : '';
-                const tag = im.confounded ? ' <span class="tag">confounded</span>' : '';
-                html += '<tr><td>' + im.date + '</td><td>' + im.drug + '</td>';
-                html += '<td>' + (im.dosageBefore || '\u2014') + '</td><td>' + im.dosageAfter + '</td>';
-                html += '<td>' + im.avgBefore.toFixed(2) + '</td><td>' + im.avgAfter.toFixed(2) + '</td>';
-                html += '<td class="' + cls + '">' + arrow + ' ' + pct + '</td>';
-                html += '<td>' + tag + '</td></tr>';
-            });
-            html += '</table>';
-            el.innerHTML = html;
-        })();
-
-        // ── Seizure-free streaks table ──
-        (function() {
-            const el = document.getElementById('pStreaks');
-            if (streaks.length === 0) { el.innerHTML = '<p class="muted">No streaks found (minimum 3 days).</p>'; return; }
-            let html = '<table><tr><th>#</th><th>Type</th><th>Period</th><th>Days</th><th>Active Medications</th></tr>';
-            streaks.forEach((s, i) => {
-                const type = s.bigOnly ? 'No big seizures' : 'Seizure-free';
-                html += '<tr><td>' + (i + 1) + '</td><td>' + type + '</td>';
-                html += '<td>' + s.start + ' \u2013 ' + s.end + '</td>';
-                html += '<td class="good">' + s.days + '</td>';
-                html += '<td class="muted">' + s.drugs + '</td></tr>';
-            });
-            html += '</table>';
-            el.innerHTML = html;
-        })();
-
-        // ── Drug correlation table ──
-        (function() {
-            const el = document.getElementById('pCorr');
-            if (correlations.length === 0) { el.innerHTML = '<p class="muted">No correlations computed.</p>'; return; }
-            let html = '<p class="note">How strongly does each drug\u2019s dose track with seizure counts over the following 7 days? The score <b>r</b> ranges from \u22121 to +1. <b style="color:#16a34a">Green (negative)</b> = higher dose, fewer seizures \u2014 the drug appears helpful. <b style="color:#dc2626">Red (positive)</b> = higher dose, more seizures \u2014 no benefit seen. Values near zero (grey) mean no clear link. This shows a pattern, not proof of cause and effect.</p>';
-            html += '<table><tr><th>Drug</th><th>Pearson r</th><th>Days on</th><th>Days off</th><th>Avg seizures/day on</th><th>Avg seizures/day off</th></tr>';
-            correlations.forEach(c => {
-                const cls = c.r < -0.1 ? 'good' : (c.r > 0.1 ? 'bad' : 'muted');
-                html += '<tr><td>' + c.drug + '</td>';
-                html += '<td class="' + cls + '">' + c.r.toFixed(3) + '</td>';
-                html += '<td>' + c.daysOn + '</td><td>' + c.daysOff + '</td>';
-                html += '<td>' + c.avgOn.toFixed(3) + '</td><td>' + c.avgOff.toFixed(3) + '</td></tr>';
-            });
-            html += '</table>';
-            el.innerHTML = html;
-        })();
 
         // ── Tab switching ──
         let lagChartInstance = null;
@@ -1219,7 +942,6 @@ private fun buildHtmlTemplate(
 
                 if (btn.dataset.tab === 'timeline') {
                     chart.resize();
-                    if (monthlyChart) monthlyChart.resize();
                 }
                 if (btn.dataset.tab === 'lag') {
                     if (!lagChartInstance) initLagTab();
@@ -1324,13 +1046,6 @@ private fun buildHtmlTemplate(
         function initChangePointsTab() {
             cusumChartInstance = echarts.init(document.getElementById('cusumChart'));
 
-            // Build drug change mark lines
-            const markLines = drugChangeMarks.map(m => ({
-                xAxis: m.date,
-                lineStyle: { color: m.color, width: 1, type: 'dashed', opacity: 0.6 },
-                label: { show: false },
-            }));
-
             // Scatter data for change points
             const decreaseData = [];
             const increaseData = [];
@@ -1349,7 +1064,6 @@ private fun buildHtmlTemplate(
                     showSymbol: false,
                     lineStyle: { width: 2, color: '#3b82f6' },
                     itemStyle: { color: '#3b82f6' },
-                    markLine: markLines.length > 0 ? { silent: true, symbol: 'none', data: markLines } : undefined,
                 },
                 {
                     name: 'Improvement',
