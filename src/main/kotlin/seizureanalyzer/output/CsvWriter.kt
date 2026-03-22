@@ -59,9 +59,9 @@ internal fun writeLlmCsv(rows: List<DailyRow>, drugs: List<String>, seizureEvent
     val hoursByDate = seizureEvents.groupBy { it.date }
     val headers = buildList {
         add("date")
+        add("seizure_hours")
         add("small_seizure_count")
         add("big_seizure_count")
-        add("seizure_hours")
         drugs.forEach { add("${it.lowercase()}_dosage_mg_morning_noon_evening") }
     }
 
@@ -70,12 +70,12 @@ internal fun writeLlmCsv(rows: List<DailyRow>, drugs: List<String>, seizureEvent
         rows.forEach { row ->
             val values = mutableListOf<String>()
             values += row.date.toString()
-            values += row.smallSeizures.toString()
-            values += row.bigSeizures.toString()
             val hours = hoursByDate[row.date]
                 ?.map { it.hour?.toString() ?: "N/A" }
                 ?.joinToString(",") ?: ""
             values += hours
+            values += row.smallSeizures.toString()
+            values += row.bigSeizures.toString()
             drugs.forEach { drug ->
                 values += (row.drugDosages[drug]?.formatTriple() ?: "")
             }
