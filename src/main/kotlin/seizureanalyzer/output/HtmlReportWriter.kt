@@ -171,10 +171,20 @@ internal fun writeHtmlReport(
         )
     })
 
+    // Seizure events for hour-of-day and day-of-week charts
+    val seizureEventsJson = mapper.writeValueAsString(categorized.seizureEvents.map { ev ->
+        mapOf(
+            "date" to ev.date.toString(),
+            "hour" to ev.hour,
+            "big" to ev.big,
+        )
+    })
+
     val html = buildHtmlTemplate(
         labelsJson, seriesJson, drugLegendJson, seizureGroupsJson,
         legendSelectedJson, rawDrugDataJson, totalSmall, totalBig,
         lagCorrelationsJson, cusumCurveJson, changePointsJson,
+        seizureEventsJson,
     )
     outFile.writeText(html)
     return outFile
@@ -192,6 +202,7 @@ private fun buildHtmlTemplate(
     lagCorrelationsJson: String,
     cusumCurveJson: String,
     changePointsJson: String,
+    seizureEventsJson: String,
 ): String = """
 <!DOCTYPE html>
 <html lang="en">
@@ -448,6 +459,20 @@ private fun buildHtmlTemplate(
             line-height: 1.5;
         }
 
+        .dist-row {
+            display: flex;
+            gap: 20px;
+            padding: 0 20px 20px;
+        }
+
+        .dist-row > div {
+            flex: 1;
+            height: 350px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+
         #lagChart, #cusumChart {
             width: 100%;
             height: 400px;
@@ -527,6 +552,11 @@ private fun buildHtmlTemplate(
             <div id="reportChart"></div>
         </div>
 
+        <!-- Distribution charts -->
+        <div class="dist-row">
+            <div id="hourChart"></div>
+            <div id="dowChart"></div>
+        </div>
     </div>
 
     <!-- Tab: Lag Analysis -->
@@ -925,6 +955,85 @@ private fun buildHtmlTemplate(
         ctrl.appendChild(hideBtn);
 
         window.addEventListener('resize', () => { chart.resize(); });
+
+        // ── Hour-of-day and Day-of-week distribution charts ──
+        const seizureEvents = $seizureEventsJson;
+
+        // Hour-of-day histogram
+        (function() {
+            const hourLabels = [];
+            for (let i = 0; i < 24; i++) hourLabels.push(i + ':00');
+            hourLabels.push('N/A');
+
+            const smallCounts = new Array(25).fill(0);
+            const bigCounts = new Array(25).fill(0);
+            seizureEvents.forEach(ev => {
+                const idx = ev.hour != null ? ev.hour : 24;
+                if (ev.big) bigCounts[idx]++;
+                else smallCounts[idx]++;
+            });
+
+            const hourChart = echarts.init(document.getElementById('hourChart'));
+            hourChart.setOption({
+                title: { text: 'Seizures by Hour of Day', left: 'center', top: 8, textStyle: { fontSize: 14, fontWeight: 600, color: '#0f172a' } },
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                legend: { top: 32, textStyle: { fontSize: 11 } },
+                grid: { top: 64, left: 50, right: 20, bottom: 32 },
+                xAxis: {
+                    type: 'category', data: hourLabels,
+                    axisLabel: { fontSize: 10, interval: 0, rotate: 0,
+                        formatter: function(v, i) { return i < 24 ? i : 'N/A'; }
+                    },
+                    axisTick: { alignWithLabel: true },
+                },
+                yAxis: {
+                    type: 'value', minInterval: 1,
+                    axisLabel: { fontSize: 11 },
+                    splitLine: { lineStyle: { type: 'dashed', color: '#e2e8f0' } },
+                },
+                series: [
+                    { name: 'Small', type: 'bar', stack: 'total', data: smallCounts, itemStyle: { color: '#7a966a' }, barMaxWidth: 20 },
+                    { name: 'Big', type: 'bar', stack: 'total', data: bigCounts, itemStyle: { color: '#dc2626' }, barMaxWidth: 20 },
+                ],
+            });
+            window.addEventListener('resize', () => hourChart.resize());
+        })();
+
+        // Day-of-week histogram
+        (function() {
+            const dowLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            const smallCounts = new Array(7).fill(0);
+            const bigCounts = new Array(7).fill(0);
+            seizureEvents.forEach(ev => {
+                const d = new Date(ev.date + 'T12:00:00');
+                const dow = (d.getDay() + 6) % 7;
+                if (ev.big) bigCounts[dow]++;
+                else smallCounts[dow]++;
+            });
+
+            const dowChart = echarts.init(document.getElementById('dowChart'));
+            dowChart.setOption({
+                title: { text: 'Seizures by Day of Week', left: 'center', top: 8, textStyle: { fontSize: 14, fontWeight: 600, color: '#0f172a' } },
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                legend: { top: 32, textStyle: { fontSize: 11 } },
+                grid: { top: 64, left: 50, right: 20, bottom: 32 },
+                xAxis: {
+                    type: 'category', data: dowLabels,
+                    axisLabel: { fontSize: 11 },
+                    axisTick: { alignWithLabel: true },
+                },
+                yAxis: {
+                    type: 'value', minInterval: 1,
+                    axisLabel: { fontSize: 11 },
+                    splitLine: { lineStyle: { type: 'dashed', color: '#e2e8f0' } },
+                },
+                series: [
+                    { name: 'Small', type: 'bar', stack: 'total', data: smallCounts, itemStyle: { color: '#7a966a' }, barMaxWidth: 40 },
+                    { name: 'Big', type: 'bar', stack: 'total', data: bigCounts, itemStyle: { color: '#dc2626' }, barMaxWidth: 40 },
+                ],
+            });
+            window.addEventListener('resize', () => dowChart.resize());
+        })();
 
         const lagCorrelations = $lagCorrelationsJson;
         const cusumCurve = $cusumCurveJson;

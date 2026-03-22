@@ -10,11 +10,27 @@ data class DrugDosage(val morning: Double, val noon: Double, val evening: Double
 
 data class DrugChange(val date: LocalDate, val dosage: DrugDosage)
 
+enum class TimeSource {
+    EXPLICIT_TIME,
+    CZECH_KEYWORD,
+    LOCATION_INFERRED,
+    UNKNOWN,
+}
+
+data class SeizureEvent(
+    val date: LocalDate,
+    val hour: Int?,
+    val timeSource: TimeSource,
+    val big: Boolean,
+    val summary: String,
+)
+
 data class CategorizedEvents(
     val drugChanges: Map<String, List<DrugChange>>,
     val smallSeizuresByDate: Map<LocalDate, Int>,
     val bigSeizuresByDate: Map<LocalDate, Int>,
     val detectedDrugs: Set<String>,
+    val seizureEvents: List<SeizureEvent>,
 )
 
 // ── Analysis result models ──

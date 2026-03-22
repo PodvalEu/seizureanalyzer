@@ -7,6 +7,8 @@ import seizureanalyzer.Config
 import seizureanalyzer.calendar.resolveDate
 import seizureanalyzer.model.CategorizedEvents
 import seizureanalyzer.model.DrugChange
+import seizureanalyzer.model.SeizureEvent
+import seizureanalyzer.parsing.extractHour
 import seizureanalyzer.parsing.parseDrugSummary
 
 internal fun categorizeEvents(
@@ -18,6 +20,7 @@ internal fun categorizeEvents(
     val detectedDrugs = sortedSetOf<String>()
     val smallSeizures = mutableMapOf<LocalDate, Int>()
     val bigSeizures = mutableMapOf<LocalDate, Int>()
+    val seizureEvents = mutableListOf<SeizureEvent>()
 
     events.forEach { event ->
         val eventDate = event.resolveDate(tz)
@@ -52,10 +55,14 @@ internal fun categorizeEvents(
 
             event.colorId in Config.smallSeizureColorIds -> {
                 smallSeizures[eventDate] = smallSeizures.getOrDefault(eventDate, 0) + 1
+                val time = extractHour(event.summary.orEmpty())
+                seizureEvents += SeizureEvent(eventDate, time.hour, time.source, big = false, event.summary.orEmpty())
             }
 
             event.colorId == Config.bigSeizureColorId -> {
                 bigSeizures[eventDate] = bigSeizures.getOrDefault(eventDate, 0) + 1
+                val time = extractHour(event.summary.orEmpty())
+                seizureEvents += SeizureEvent(eventDate, time.hour, time.source, big = true, event.summary.orEmpty())
             }
 
             else -> {
@@ -71,5 +78,6 @@ internal fun categorizeEvents(
         smallSeizuresByDate = smallSeizures,
         bigSeizuresByDate = bigSeizures,
         detectedDrugs = detectedDrugs,
+        seizureEvents = seizureEvents,
     )
 }
