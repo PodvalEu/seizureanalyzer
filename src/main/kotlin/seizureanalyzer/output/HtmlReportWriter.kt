@@ -585,32 +585,18 @@ private fun buildHtmlTemplate(
         <div class="lag-content">
             <p class="note">
                 <strong>What is this?</strong>
-                Imagine drawing a line that goes up on bad days (more seizures than average) and down
-                on good days (fewer than average). Over time, this line drifts &mdash; if seizures get
-                worse, it climbs; if they get better, it drops.
-                This chart shows that running total. The <b style="color:#16a34a">green dots ▼</b> mark
-                dates where things started getting noticeably <em>better</em>, and the
-                <b style="color:#dc2626">red dots ▲</b> mark dates where things started getting
-                noticeably <em>worse</em>.
+                The line goes up on bad days and down on good days. Where it drifts far enough
+                to matter, a dot appears:
+                <b style="color:#16a34a">green ▼</b> = things got better,
+                <b style="color:#dc2626">red ▲</b> = things got worse.
+                This finds when seizures <em>actually</em> shifted &mdash; which may or may not
+                line up with a drug change. Dashed vertical lines show drug changes for comparison.
             </p>
             <p class="note">
-                <strong>Why is it useful?</strong>
-                When a doctor changes a medication, it&rsquo;s tempting to assume that whatever
-                happened next was caused by that change. But sometimes seizures shift for other
-                reasons &mdash; illness, poor sleep, stress, or just random variation.
-                This analysis ignores the drug schedule entirely and looks <em>only</em> at the
-                seizure numbers to find when things truly changed.
-                It then checks: was there a drug change nearby? If yes, that drug change likely
-                played a role. If not, something else was going on.
-                The vertical dashed lines on the chart show drug change dates so you can
-                visually compare.
-            </p>
-            <p class="note">
-                <strong>How to read the table:</strong>
-                Each row is a detected turning point. &ldquo;Magnitude&rdquo; is how big the shift
-                was (bigger = more dramatic change). &ldquo;Active Drugs&rdquo; lists what was being
-                taken at that time. &ldquo;Nearest Drug Change&rdquo; shows the closest medication
-                adjustment &mdash; if blank, the shift happened without any recent drug change.
+                <strong>Reading the table:</strong>
+                &ldquo;Magnitude&rdquo; = how big the shift was.
+                &ldquo;Nearest Drug Change&rdquo; = the closest medication adjustment &mdash;
+                if blank, the shift happened without any recent drug change.
             </p>
             <div id="cusumChart"></div>
             <div id="cusumTable"></div>
