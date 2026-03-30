@@ -1,12 +1,15 @@
 package seizureanalyzer.analysis
 
 import com.google.api.services.calendar.model.Event
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.plus
 import seizureanalyzer.Config
 import seizureanalyzer.calendar.resolveDate
 import seizureanalyzer.model.CategorizedEvents
 import seizureanalyzer.model.DrugChange
+import seizureanalyzer.model.DrugDosage
 import seizureanalyzer.model.SeizureEvent
 import seizureanalyzer.parsing.extractHour
 import seizureanalyzer.parsing.parseDrugSummary
@@ -18,6 +21,7 @@ internal fun categorizeEvents(
 ): CategorizedEvents {
     val drugChanges = mutableMapOf<String, MutableList<DrugChange>>()
     val detectedDrugs = sortedSetOf<String>()
+    val oneTimeDrugs = mutableSetOf<String>()
     val smallSeizures = mutableMapOf<LocalDate, Int>()
     val bigSeizures = mutableMapOf<LocalDate, Int>()
     val seizureEvents = mutableListOf<SeizureEvent>()
@@ -28,8 +32,10 @@ internal fun categorizeEvents(
             return@forEach
         }
 
+        val isOneTime = event.colorId in Config.oneTimeDrugColorIds
+
         when {
-            event.colorId in Config.drugColorIds -> {
+            event.colorId in Config.drugColorIds || isOneTime -> {
                 val summary = event.summary.orEmpty()
                 val parseResult = parseDrugSummary(summary)
                 if (parseResult.matches.isEmpty()) {
@@ -42,8 +48,12 @@ internal fun categorizeEvents(
                 parseResult.matches.forEach matches@{ parsed ->
                     if (parsed.name.lowercase() in Config.excludeDrugs) return@matches
                     detectedDrugs += parsed.name
-                    drugChanges.getOrPut(parsed.name) { mutableListOf() }
-                        .add(DrugChange(eventDate, parsed.dosage))
+                    val changes = drugChanges.getOrPut(parsed.name) { mutableListOf() }
+                    changes.add(DrugChange(eventDate, parsed.dosage))
+                    if (isOneTime) {
+                        oneTimeDrugs += parsed.name
+                        changes.add(DrugChange(eventDate.plus(1, DateTimeUnit.DAY), DrugDosage(0.0, 0.0, 0.0)))
+                    }
                 }
 
                 if (parseResult.unmatchedSegments.isNotEmpty()) {
@@ -79,5 +89,6 @@ internal fun categorizeEvents(
         bigSeizuresByDate = bigSeizures,
         detectedDrugs = detectedDrugs,
         seizureEvents = seizureEvents,
+        oneTimeDrugs = oneTimeDrugs,
     )
 }

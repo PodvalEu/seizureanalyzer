@@ -20,14 +20,21 @@ internal fun parseDrugSummary(summary: String): DrugParseResult {
         .filter { it.isNotEmpty() }
         .forEach { segment ->
             val match = DRUG_ENTRY_PATTERN.find(segment)
-            if (match == null) {
-                unmatched += segment.replace(WHITESPACE_RUN, " ")
-            } else {
+            if (match != null) {
                 val drugName = normalizeDrugName(match.groupValues[1])
                 val morning = match.groupValues[2].toDoubleValue()
                 val noon = match.groupValues[3].toDoubleValue()
                 val evening = match.groupValues[4].toDoubleValue()
                 matches += ParsedDrugLine(drugName, DrugDosage(morning, noon, evening))
+            } else {
+                val singleMatch = SINGLE_DOSE_PATTERN.find(segment)
+                if (singleMatch != null) {
+                    val drugName = normalizeDrugName(singleMatch.groupValues[1])
+                    val dose = singleMatch.groupValues[2].toDoubleValue()
+                    matches += ParsedDrugLine(drugName, DrugDosage(dose, 0.0, 0.0))
+                } else {
+                    unmatched += segment.replace(WHITESPACE_RUN, " ")
+                }
             }
         }
 
