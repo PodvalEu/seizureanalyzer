@@ -45,6 +45,7 @@ jobs:
         env:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          CALENDAR_NAME: Rafael neurologie
           ANALYSIS_END: ${{ steps.date.outputs.today }}
         run: ./build/install/seizureanalyzer/bin/seizureanalyzer
 
