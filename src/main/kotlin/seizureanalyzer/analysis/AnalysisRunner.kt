@@ -14,4 +14,5 @@ internal fun runAnalysis(rows: List<DailyRow>, categorized: CategorizedEvents): 
         lagCorrelations = computeLagCorrelations(rows),
         changePoints = detectChangePoints(rows, categorized),
         volatilityAnalysis = analyzeVolatility(rows),
+        titrationTrajectories = analyzeTitrations(rows, categorized),
     )

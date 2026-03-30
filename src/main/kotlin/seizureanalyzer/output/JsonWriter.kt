@@ -194,6 +194,27 @@ internal fun writeChatGptSummary(
         }
     }
 
+    val titrationTrajectories = analysis.titrationTrajectories.map { t ->
+        buildMap<String, Any> {
+            put("drug", t.drug)
+            put("direction", t.direction.name)
+            put("start_date", t.startDate.toString())
+            put("end_date", t.endDate.toString())
+            put("pace", t.paceCategory.name)
+            put("avg_days_between_steps", t.avgDaysBetweenSteps)
+            put("seizure_slope_during", t.seizureSlopeDuring)
+            put("avg_seizures_during", t.avgSeizuresDuring)
+            put("avg_seizures_after", t.avgSeizuresAfter)
+            put("steps", t.steps.map { s ->
+                mapOf(
+                    "date" to s.date.toString(),
+                    "dosage_before" to s.dosageBefore,
+                    "dosage_after" to s.dosageAfter,
+                )
+            })
+        }
+    }
+
     val payload: Map<String, Any> = mapOf(
         "analysis_window" to mapOf("start" to Config.analysisStart.toString(), "end" to Config.analysisEnd.toString()),
         "seizure_rollup" to seizureRollup,
@@ -209,6 +230,7 @@ internal fun writeChatGptSummary(
         "lag_correlations" to lagCorrelations,
         "change_points" to changePoints,
         "volatility_analysis" to volatilityAnalysis,
+        "titration_trajectories" to titrationTrajectories,
         "run_metadata" to mapOf(
             "row_count" to rows.size,
             "drugs_tracked" to categorized.detectedDrugs.size,
