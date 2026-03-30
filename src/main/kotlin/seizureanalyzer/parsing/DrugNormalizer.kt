@@ -10,6 +10,12 @@ internal val DRUG_ENTRY_PATTERN = Regex(
     RegexOption.IGNORE_CASE,
 )
 
+internal val SINGLE_DOSE_PATTERN = Regex(
+    "^\\s*(?:[\\p{So}\\p{Sk}]|\uD83D\uDC8A)?\\s*(.+?)\\s+" +
+        "(\\d+(?:[.,]\\d+)?)\\s*(?:mg|ml|kapky|drops)(?:\\s.*)?$",
+    RegexOption.IGNORE_CASE,
+)
+
 internal fun normalizeDrugSummary(summary: String): String = Normalizer.normalize(summary, Normalizer.Form.NFKC)
     .replace("–", "-")
     .replace(Regex("\\s+-\\s+"), " - ")

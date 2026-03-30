@@ -39,6 +39,10 @@ internal object Config {
         ?.split(",")?.map { it.trim() }?.toSet()
         ?: setOf("2")
 
+    val oneTimeDrugColorIds: Set<String> = this["ONETIME_DRUG_COLOR_IDS"]
+        ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet()
+        ?: emptySet()
+
     val bigSeizureColorId: String = this["BIG_SEIZURE_COLOR_ID"] ?: "3"
 
     val excludeDrugs: Set<String> = this["EXCLUDE_DRUGS"]

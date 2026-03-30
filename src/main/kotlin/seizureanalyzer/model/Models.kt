@@ -31,6 +31,7 @@ data class CategorizedEvents(
     val bigSeizuresByDate: Map<LocalDate, Int>,
     val detectedDrugs: Set<String>,
     val seizureEvents: List<SeizureEvent>,
+    val oneTimeDrugs: Set<String> = emptySet(),
 )
 
 // ── Analysis result models ──
@@ -124,6 +125,28 @@ data class VolatilityStats(
     val bursts: List<Burst>,
 )
 
+enum class TitrationDirection { UP, DOWN }
+enum class PaceCategory { FAST, NORMAL, SLOW }
+
+data class TitrationStep(
+    val date: LocalDate,
+    val dosageBefore: Double,
+    val dosageAfter: Double,
+)
+
+data class TitrationTrajectory(
+    val drug: String,
+    val direction: TitrationDirection,
+    val steps: List<TitrationStep>,
+    val startDate: LocalDate,
+    val endDate: LocalDate,
+    val paceCategory: PaceCategory,
+    val avgDaysBetweenSteps: Double,
+    val seizureSlopeDuring: Double,
+    val avgSeizuresDuring: Double,
+    val avgSeizuresAfter: Double,
+)
+
 data class AnalysisResults(
     val drugChangeImpacts: List<DrugChangeImpact>,
     val regimenRanking: List<RegimenStats>,
@@ -133,6 +156,7 @@ data class AnalysisResults(
     val lagCorrelations: List<LagCorrelation>,
     val changePoints: List<ChangePoint>,
     val volatilityAnalysis: List<VolatilityStats>,
+    val titrationTrajectories: List<TitrationTrajectory>,
 )
 
 // ── Core data models ──
