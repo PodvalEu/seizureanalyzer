@@ -25,6 +25,13 @@ data class SeizureEvent(
     val summary: String,
 )
 
+data class SkippedEvent(
+    val date: LocalDate?,
+    val summary: String,
+    val colorId: String?,
+    val reason: String,
+)
+
 data class CategorizedEvents(
     val drugChanges: Map<String, List<DrugChange>>,
     val smallSeizuresByDate: Map<LocalDate, Int>,
@@ -32,6 +39,7 @@ data class CategorizedEvents(
     val detectedDrugs: Set<String>,
     val seizureEvents: List<SeizureEvent>,
     val oneTimeDrugs: Set<String> = emptySet(),
+    val skippedEvents: List<SkippedEvent> = emptyList(),
 )
 
 // ── Analysis result models ──
