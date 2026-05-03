@@ -116,7 +116,7 @@ internal fun writeHtmlReport(
                 put("smooth", true)
                 put("showSymbol", false)
                 put("yAxisIndex", 1)
-                put("lineStyle", mapOf("width" to 1, "color" to style.totalColor, "type" to "dotted", "opacity" to 0.4))
+                put("lineStyle", mapOf("width" to 2, "color" to style.totalColor, "type" to "dotted", "opacity" to 0.4))
                 put("itemStyle", mapOf("color" to style.totalColor))
                 put("data", rows.map { it.getForwardSmall(window) + it.getForwardBig(window) })
                 if (!style.defaultVisible) put("selected", false)
