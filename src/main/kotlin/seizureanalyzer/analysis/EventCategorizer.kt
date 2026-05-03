@@ -11,6 +11,7 @@ import seizureanalyzer.model.CategorizedEvents
 import seizureanalyzer.model.DrugChange
 import seizureanalyzer.model.DrugDosage
 import seizureanalyzer.model.SeizureEvent
+import seizureanalyzer.model.SkippedEvent
 import seizureanalyzer.parsing.extractHour
 import seizureanalyzer.parsing.parseDrugSummary
 
@@ -25,10 +26,17 @@ internal fun categorizeEvents(
     val smallSeizures = mutableMapOf<LocalDate, Int>()
     val bigSeizures = mutableMapOf<LocalDate, Int>()
     val seizureEvents = mutableListOf<SeizureEvent>()
+    val skippedEvents = mutableListOf<SkippedEvent>()
 
     events.forEach { event ->
         val eventDate = event.resolveDate(tz)
         if (eventDate == null || eventDate < Config.analysisStart || eventDate > Config.analysisEnd) {
+            skippedEvents += SkippedEvent(
+                date = eventDate,
+                summary = event.summary.orEmpty(),
+                colorId = event.colorId,
+                reason = "Outside analysis range",
+            )
             return@forEach
         }
 
@@ -41,6 +49,12 @@ internal fun categorizeEvents(
                 if (parseResult.matches.isEmpty()) {
                     echo(
                         "Skipping drug change event '$summary' (id=${event.id}, colorId=${event.colorId}) - unmatched dosage format. Segments=${parseResult.unmatchedSegments}"
+                    )
+                    skippedEvents += SkippedEvent(
+                        date = eventDate,
+                        summary = summary,
+                        colorId = event.colorId,
+                        reason = "Unmatched dosage format",
                     )
                     return@forEach
                 }
@@ -77,6 +91,12 @@ internal fun categorizeEvents(
 
             else -> {
                 echo("Ignoring event '${event.summary}' (id=${event.id}) with unsupported colorId='${event.colorId}'")
+                skippedEvents += SkippedEvent(
+                    date = eventDate,
+                    summary = event.summary.orEmpty(),
+                    colorId = event.colorId,
+                    reason = "Unsupported colorId",
+                )
             }
         }
     }
@@ -90,5 +110,6 @@ internal fun categorizeEvents(
         detectedDrugs = detectedDrugs,
         seizureEvents = seizureEvents,
         oneTimeDrugs = oneTimeDrugs,
+        skippedEvents = skippedEvents,
     )
 }

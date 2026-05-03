@@ -248,11 +248,21 @@ internal fun writeHtmlReport(
         rows.associate { it.date.toString() to (it.smallSeizures + it.bigSeizures) }
     )
 
+    val skippedEventsJson = mapper.writeValueAsString(categorized.skippedEvents.map { ev ->
+        mapOf(
+            "date" to ev.date?.toString(),
+            "summary" to ev.summary,
+            "colorId" to ev.colorId,
+            "reason" to ev.reason,
+        )
+    })
+
     val html = buildHtmlTemplate(
         labelsJson, seriesJson, drugLegendJson, seizureGroupsJson,
         legendSelectedJson, rawDrugDataJson, totalSmall, totalBig,
         lagCorrelationsJson, cusumCurveJson, changePointsJson,
         seizureEventsJson, volatilityJson, titrationJson, dailySeizuresJson,
+        skippedEventsJson,
     )
     outFile.writeText(html)
     return outFile
@@ -274,6 +284,7 @@ private fun buildHtmlTemplate(
     volatilityJson: String,
     titrationJson: String,
     dailySeizuresJson: String,
+    skippedEventsJson: String,
 ): String = """
 <!DOCTYPE html>
 <html lang="en">
@@ -654,6 +665,7 @@ private fun buildHtmlTemplate(
         <button data-tab="changepoints">Change Points</button>
         <button data-tab="volatility">Volatility</button>
         <button data-tab="titration">Titrations</button>
+        <button data-tab="events">Events</button>
     </div>
 
     <!-- Tab: Timeline -->
@@ -755,6 +767,17 @@ private fun buildHtmlTemplate(
             <div class="drug-selector" id="titrationDrugSelector"></div>
             <div id="titrationChart"></div>
             <div id="titrationTable"></div>
+        </div>
+    </div>
+
+    <!-- Tab: Events -->
+    <div id="tab-events" class="tab-content">
+        <div class="lag-content">
+            <p class="note">
+                Calendar events excluded from the charts &mdash; review to fix typos,
+                wrong colors, or missing dosage formats.
+            </p>
+            <div id="eventsTable"></div>
         </div>
     </div>
 
@@ -1210,6 +1233,7 @@ private fun buildHtmlTemplate(
         const volatilityData = $volatilityJson;
         const titrationData = $titrationJson;
         const dailySeizures = $dailySeizuresJson;
+        const skippedEvents = $skippedEventsJson;
 
         // ── Tab switching ──
         let lagChartInstance = null;
@@ -1217,6 +1241,7 @@ private fun buildHtmlTemplate(
         let volScatterInstance = null;
         let volTimelineInstance = null;
         let titrationChartInstance = null;
+        let eventsRendered = false;
         document.querySelectorAll('.tab-bar button').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
@@ -1243,8 +1268,41 @@ private fun buildHtmlTemplate(
                     if (!titrationChartInstance) initTitrationTab();
                     else titrationChartInstance.resize();
                 }
+                if (btn.dataset.tab === 'events' && !eventsRendered) {
+                    initEventsTab();
+                    eventsRendered = true;
+                }
             });
         });
+
+        // ── Events tab (skipped events) ──
+        function initEventsTab() {
+            const el = document.getElementById('eventsTable');
+            if (!skippedEvents || skippedEvents.length === 0) {
+                el.innerHTML = '<p class="muted">No skipped events &mdash; all calendar events were used in the charts.</p>';
+                return;
+            }
+            const escape = s => String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            const sorted = skippedEvents.slice().sort((a, b) => {
+                const da = a.date || '';
+                const db = b.date || '';
+                if (da === db) return 0;
+                return da < db ? 1 : -1;
+            });
+            let html = '<table><tr><th>Date</th><th>Summary</th><th>colorId</th><th>Reason</th></tr>';
+            sorted.forEach(ev => {
+                html += '<tr>';
+                html += '<td>' + escape(ev.date || '—') + '</td>';
+                html += '<td>' + escape(ev.summary) + '</td>';
+                html += '<td class="muted">' + escape(ev.colorId || '—') + '</td>';
+                html += '<td class="muted">' + escape(ev.reason) + '</td>';
+                html += '</tr>';
+            });
+            html += '</table>';
+            el.innerHTML = html;
+        }
 
         // ── Lag Analysis tab ──
         function initLagTab() {
