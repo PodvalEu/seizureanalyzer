@@ -640,6 +640,142 @@ private fun buildHtmlTemplate(
         .lag-content .bad { color: #dc2626; }
         .lag-content .muted { color: var(--text-muted); }
         .lag-content .best { font-weight: 700; }
+
+        /* ── Calendar tab ── */
+        .cal-wrap { max-width: none; }
+
+        .cal-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .cal-year-select {
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--surface);
+            color: var(--text);
+            cursor: pointer;
+        }
+
+        .calendar-table {
+            border-collapse: collapse;
+            font-size: 11px;
+            font-variant-numeric: tabular-nums;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        .calendar-table th,
+        .calendar-table td {
+            border: 1px solid #e2e8f0;
+            padding: 0;
+            text-align: center;
+            vertical-align: middle;
+            background: var(--surface);
+        }
+
+        .calendar-table thead th {
+            background: #f1f5f9;
+            font-weight: 600;
+            font-size: 10px;
+            color: #475569;
+            padding: 4px 0;
+            min-width: 22px;
+        }
+
+        .calendar-table th.cal-corner,
+        .calendar-table th.cal-icon-col {
+            min-width: 28px;
+            width: 28px;
+        }
+
+        .calendar-table th.cal-month-col {
+            min-width: 72px;
+            width: 72px;
+            text-align: left;
+            padding-left: 8px;
+        }
+
+        .calendar-table th.cal-total-col {
+            min-width: 36px;
+            width: 36px;
+        }
+
+        .calendar-table td.cal-month-label {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #334155;
+            text-align: left;
+            padding: 0 8px;
+            border-right: 2px solid var(--border);
+        }
+
+        .calendar-table td.cal-icon {
+            background: #f8fafc;
+            font-size: 12px;
+            color: #64748b;
+            width: 28px;
+        }
+
+        .calendar-table tr.cal-row-night td.cal-cell { background: #fafbff; }
+        .calendar-table tr.cal-row-day  td.cal-cell { background: #ffffff; }
+
+        .calendar-table tr.cal-row-day td {
+            border-bottom: 2px solid var(--border);
+        }
+
+        .calendar-table td.cal-cell {
+            width: 22px;
+            height: 22px;
+            font-size: 10px;
+            line-height: 1;
+            padding: 1px;
+            white-space: normal;
+            word-break: break-all;
+            overflow: hidden;
+        }
+
+        .calendar-table td.cal-disabled {
+            background: repeating-linear-gradient(
+                45deg,
+                #f1f5f9,
+                #f1f5f9 2px,
+                #e2e8f0 2px,
+                #e2e8f0 4px
+            );
+        }
+
+        .calendar-table td.cal-total {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #334155;
+            border-left: 2px solid var(--border);
+        }
+
+        .cal-sym-big {
+            color: #dc2626;
+            font-weight: 700;
+            margin: 0 0.5px;
+        }
+
+        .cal-sym-small {
+            color: #475569;
+            font-weight: 700;
+            margin: 0 0.5px;
+        }
+
+        .cal-footnote {
+            margin-top: 12px;
+            font-size: 11px;
+        }
     </style>
 </head>
 <body>
@@ -665,6 +801,7 @@ private fun buildHtmlTemplate(
         <button data-tab="changepoints">Change Points</button>
         <button data-tab="volatility">Volatility</button>
         <button data-tab="titration">Titrations</button>
+        <button data-tab="calendar">Calendar</button>
         <button data-tab="events">Events</button>
     </div>
 
@@ -767,6 +904,26 @@ private fun buildHtmlTemplate(
             <div class="drug-selector" id="titrationDrugSelector"></div>
             <div id="titrationChart"></div>
             <div id="titrationTable"></div>
+        </div>
+    </div>
+
+    <!-- Tab: Calendar -->
+    <div id="tab-calendar" class="tab-content">
+        <div class="lag-content cal-wrap">
+            <p class="note">
+                Yearly seizure calendar mirroring the paper form (DESITIN
+                &ldquo;Z&aacute;znam z&aacute;chvat&#367;&rdquo;). Each month has two rows:
+                &#127769; for nocturnal seizures (22:00&ndash;06:59), &#9728;&#65039; for daytime
+                (07:00&ndash;21:59). <span class="cal-sym-big">&#9711;</span> = big seizure,
+                <span class="cal-sym-small">&times;</span> = small seizure.
+                Multiple symbols mean multiple seizures in that day/night.
+            </p>
+            <div class="cal-controls">
+                <label for="calendarYear" class="ctrl-label">Year</label>
+                <select id="calendarYear" class="cal-year-select"></select>
+            </div>
+            <div id="calendarGrid"></div>
+            <p class="note cal-footnote" id="calendarFootnote"></p>
         </div>
     </div>
 
@@ -1242,6 +1399,7 @@ private fun buildHtmlTemplate(
         let volTimelineInstance = null;
         let titrationChartInstance = null;
         let eventsRendered = false;
+        let calendarRendered = false;
         document.querySelectorAll('.tab-bar button').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
@@ -1271,6 +1429,10 @@ private fun buildHtmlTemplate(
                 if (btn.dataset.tab === 'events' && !eventsRendered) {
                     initEventsTab();
                     eventsRendered = true;
+                }
+                if (btn.dataset.tab === 'calendar' && !calendarRendered) {
+                    initCalendarTab();
+                    calendarRendered = true;
                 }
             });
         });
@@ -1302,6 +1464,97 @@ private fun buildHtmlTemplate(
             });
             html += '</table>';
             el.innerHTML = html;
+        }
+
+        // ── Calendar tab (yearly paper-form) ──
+        const CAL_MONTHS = ['January','February','March','April','May','June',
+                            'July','August','September','October','November','December'];
+
+        function daysInMonth(year, month1) {
+            return new Date(year, month1, 0).getDate();
+        }
+
+        function initCalendarTab() {
+            const sel = document.getElementById('calendarYear');
+            const grid = document.getElementById('calendarGrid');
+            const years = [...new Set(seizureEvents.map(e => +e.date.slice(0, 4)))].sort((a, b) => a - b);
+            if (years.length === 0) {
+                grid.innerHTML = '<p class="muted">No seizure events to display.</p>';
+                return;
+            }
+            sel.innerHTML = years.map(y => '<option value="' + y + '">' + y + '</option>').join('');
+            sel.value = years[years.length - 1];
+            sel.addEventListener('change', () => renderCalendar(+sel.value));
+            renderCalendar(+sel.value);
+        }
+
+        function renderCalendar(year) {
+            const yearPrefix = year + '-';
+            const buckets = Array.from({length: 12}, () =>
+                [Array.from({length: 32}, () => ({big: 0, small: 0})),
+                 Array.from({length: 32}, () => ({big: 0, small: 0}))]);
+            let unknownHourFallback = 0;
+            seizureEvents.forEach(ev => {
+                if (!ev.date.startsWith(yearPrefix)) return;
+                const parts = ev.date.split('-');
+                const m = parseInt(parts[1], 10);
+                const d = parseInt(parts[2], 10);
+                if (m < 1 || m > 12 || d < 1 || d > 31) return;
+                const isNight = ev.hour != null && (ev.hour >= 22 || ev.hour < 7);
+                if (ev.hour == null) unknownHourFallback++;
+                const cell = buckets[m - 1][isNight ? 0 : 1][d];
+                if (ev.big) cell.big++; else cell.small++;
+            });
+
+            let html = '<table class="calendar-table"><thead><tr>';
+            html += '<th class="cal-corner"></th><th class="cal-month-col">Month</th><th class="cal-icon-col"></th>';
+            for (let d = 1; d <= 31; d++) html += '<th>' + d + '</th>';
+            html += '<th class="cal-total-col">Σ</th></tr></thead><tbody>';
+
+            let yearTotalBig = 0, yearTotalSmall = 0;
+            for (let mi = 0; mi < 12; mi++) {
+                const dim = daysInMonth(year, mi + 1);
+
+                for (let part = 0; part < 2; part++) {
+                    const isNight = part === 0;
+                    let rowBig = 0, rowSmall = 0;
+                    html += '<tr class="' + (isNight ? 'cal-row-night' : 'cal-row-day') + '">';
+                    if (isNight) {
+                        // rowspan="2" — emit corner + month label only on the night row; covers both rows.
+                        html += '<td rowspan="2" class="cal-corner"></td>';
+                        html += '<td rowspan="2" class="cal-month-label">' + CAL_MONTHS[mi] + '</td>';
+                    }
+                    html += '<td class="cal-icon">' + (isNight ? '&#127769;' : '&#9728;&#65039;') + '</td>';
+                    for (let d = 1; d <= 31; d++) {
+                        if (d > dim) {
+                            html += '<td class="cal-disabled"></td>';
+                            continue;
+                        }
+                        const c = buckets[mi][part][d];
+                        rowBig += c.big;
+                        rowSmall += c.small;
+                        let inner = '';
+                        for (let i = 0; i < c.big; i++) inner += '<span class="cal-sym-big">&#9711;</span>';
+                        for (let i = 0; i < c.small; i++) inner += '<span class="cal-sym-small">&times;</span>';
+                        html += '<td class="cal-cell">' + inner + '</td>';
+                    }
+                    const rowTotal = rowBig + rowSmall;
+                    html += '<td class="cal-total">' + (rowTotal || '') + '</td></tr>';
+                    yearTotalBig += rowBig;
+                    yearTotalSmall += rowSmall;
+                }
+            }
+            html += '</tbody></table>';
+            document.getElementById('calendarGrid').innerHTML = html;
+
+            const foot = document.getElementById('calendarFootnote');
+            const yearTotal = yearTotalBig + yearTotalSmall;
+            let footHtml = year + ' total: <b>' + yearTotal + '</b> seizures (' + yearTotalSmall + ' small, ' + yearTotalBig + ' big).';
+            if (unknownHourFallback > 0) {
+                footHtml += ' ' + unknownHourFallback + ' event' + (unknownHourFallback === 1 ? '' : 's') +
+                    ' had no parseable time and were placed in the day row.';
+            }
+            foot.innerHTML = footHtml;
         }
 
         // ── Lag Analysis tab ──
