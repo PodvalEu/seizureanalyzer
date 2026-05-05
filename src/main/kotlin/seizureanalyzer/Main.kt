@@ -81,7 +81,7 @@ class App : CliktCommand(name = "seizureanalyzer") {
 
         writeDailyCsv(dailyRows, drugs, File(csvOut))
         writeLlmCsv(dailyRows, drugs, categorized.seizureEvents, File(Config.llmCsvOut))
-        val reportPath = writeHtmlReport(dailyRows, drugs, categorized, analysis, File(reportHtml))
+        val reportPath = writeHtmlReport(dailyRows, drugs, categorized, File(reportHtml))
         val summaryPath = writeChatGptSummary(dailyRows, categorized, analysis, File(summaryJsonOut))
 
         echo("Daily CSV: ${File(csvOut).absolutePath}")
