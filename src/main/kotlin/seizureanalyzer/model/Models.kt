@@ -95,76 +95,12 @@ data class DrugCorrelation(
     val avgSeizuresOffDrug: Double,
 )
 
-data class LagCorrelation(
-    val drug: String,
-    val lagDays: Int,
-    val pearsonR: Double,
-    val sampleSize: Int,
-    val windowDays: Int,
-)
-
-enum class ChangeDirection { INCREASE, DECREASE }
-
-data class ChangePoint(
-    val date: LocalDate,
-    val direction: ChangeDirection,
-    val magnitude: Double,
-    val cumulativeSum: Double,
-    val activeDrugs: Map<String, Double>,
-    val recentDrugChange: String?,
-)
-
-data class Burst(
-    val startDate: LocalDate,
-    val endDate: LocalDate,
-    val days: Int,
-    val totalSeizures: Int,
-    val activeDrugs: Map<String, Double>,
-)
-
-data class VolatilityStats(
-    val dosages: Map<String, Double>,
-    val startDate: LocalDate,
-    val endDate: LocalDate,
-    val days: Int,
-    val avgDailySeizures: Double,
-    val cv: Double,
-    val dispersionIndex: Double,
-    val bursts: List<Burst>,
-)
-
-enum class TitrationDirection { UP, DOWN }
-enum class PaceCategory { FAST, NORMAL, SLOW }
-
-data class TitrationStep(
-    val date: LocalDate,
-    val dosageBefore: Double,
-    val dosageAfter: Double,
-)
-
-data class TitrationTrajectory(
-    val drug: String,
-    val direction: TitrationDirection,
-    val steps: List<TitrationStep>,
-    val startDate: LocalDate,
-    val endDate: LocalDate,
-    val paceCategory: PaceCategory,
-    val avgDaysBetweenSteps: Double,
-    val seizureSlopeDuring: Double,
-    val avgSeizuresDuring: Double,
-    val avgSeizuresAfter: Double,
-)
-
 data class AnalysisResults(
     val drugChangeImpacts: List<DrugChangeImpact>,
     val regimenRanking: List<RegimenStats>,
     val monthlyTrend: List<MonthlyStats>,
     val seizureFreeStreaks: List<SeizureFreeStreak>,
     val drugCorrelations: List<DrugCorrelation>,
-    val lagCorrelations: List<LagCorrelation>,
-    val changePoints: List<ChangePoint>,
-    val volatilityAnalysis: List<VolatilityStats>,
-    val titrationTrajectories: List<TitrationTrajectory>,
 )
 
 // ── Core data models ──

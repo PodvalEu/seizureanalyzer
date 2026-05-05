@@ -1,7 +1,6 @@
 package seizureanalyzer.output
 
 import seizureanalyzer.Config
-import seizureanalyzer.model.AnalysisResults
 import seizureanalyzer.model.CategorizedEvents
 import seizureanalyzer.model.DailyRow
 import java.io.File
@@ -10,7 +9,6 @@ internal fun writeHtmlReport(
     rows: List<DailyRow>,
     drugs: List<String>,
     categorized: CategorizedEvents,
-    analysis: AnalysisResults,
     baseFile: File,
 ): File {
     val outFile = resolveReportHtmlFile(baseFile)
@@ -162,34 +160,6 @@ internal fun writeHtmlReport(
     val totalBig = rows.sumOf { it.bigSeizures }
 
 
-    val lagCorrelationsJson = mapper.writeValueAsString(analysis.lagCorrelations.map { lc ->
-        mapOf(
-            "drug" to lc.drug,
-            "lag" to lc.lagDays,
-            "r" to lc.pearsonR,
-            "n" to lc.sampleSize,
-            "w" to lc.windowDays,
-        )
-    })
-
-    val cusumCurveJson = mapper.writeValueAsString(
-        seizureanalyzer.analysis.computeCusumCurve(rows).map { (date, value) ->
-            mapOf("date" to date.toString(), "cusum" to value)
-        }
-    )
-
-    val changePointsJson = mapper.writeValueAsString(analysis.changePoints.map { cp ->
-        mapOf(
-            "date" to cp.date.toString(),
-            "direction" to cp.direction.name,
-            "magnitude" to cp.magnitude,
-            "cusum" to cp.cumulativeSum,
-            "drugs" to cp.activeDrugs.entries.sortedBy { it.key }
-                .joinToString(", ") { "${it.key} ${it.value}" },
-            "drugChange" to cp.recentDrugChange,
-        )
-    })
-
     // Seizure events for hour-of-day and day-of-week charts
     val seizureEventsJson = mapper.writeValueAsString(categorized.seizureEvents.map { ev ->
         mapOf(
@@ -198,55 +168,6 @@ internal fun writeHtmlReport(
             "big" to ev.big,
         )
     })
-
-    val volatilityJson = mapper.writeValueAsString(analysis.volatilityAnalysis.map { v ->
-        mapOf(
-            "dosages" to v.dosages.entries.sortedBy { it.key }
-                .joinToString(", ") { "${it.key} ${it.value}" },
-            "startDate" to v.startDate.toString(),
-            "endDate" to v.endDate.toString(),
-            "days" to v.days,
-            "avg" to v.avgDailySeizures,
-            "cv" to v.cv,
-            "di" to v.dispersionIndex,
-            "bursts" to v.bursts.map { b ->
-                mapOf(
-                    "start" to b.startDate.toString(),
-                    "end" to b.endDate.toString(),
-                    "days" to b.days,
-                    "seizures" to b.totalSeizures,
-                    "drugs" to b.activeDrugs.entries.sortedBy { it.key }
-                        .joinToString(", ") { "${it.key} ${it.value}" },
-                )
-            },
-        )
-    })
-
-    val titrationJson = mapper.writeValueAsString(analysis.titrationTrajectories.map { t ->
-        mapOf(
-            "drug" to t.drug,
-            "direction" to t.direction.name,
-            "startDate" to t.startDate.toString(),
-            "endDate" to t.endDate.toString(),
-            "pace" to t.paceCategory.name,
-            "avgGap" to t.avgDaysBetweenSteps,
-            "slopeDuring" to t.seizureSlopeDuring,
-            "avgDuring" to t.avgSeizuresDuring,
-            "avgAfter" to t.avgSeizuresAfter,
-            "steps" to t.steps.map { s ->
-                mapOf(
-                    "date" to s.date.toString(),
-                    "before" to s.dosageBefore,
-                    "after" to s.dosageAfter,
-                )
-            },
-        )
-    })
-
-    // Daily seizures keyed by date for titration chart overlay
-    val dailySeizuresJson = mapper.writeValueAsString(
-        rows.associate { it.date.toString() to (it.smallSeizures + it.bigSeizures) }
-    )
 
     val skippedEventsJson = mapper.writeValueAsString(categorized.skippedEvents.map { ev ->
         mapOf(
@@ -260,8 +181,7 @@ internal fun writeHtmlReport(
     val html = buildHtmlTemplate(
         labelsJson, seriesJson, drugLegendJson, seizureGroupsJson,
         legendSelectedJson, rawDrugDataJson, totalSmall, totalBig,
-        lagCorrelationsJson, cusumCurveJson, changePointsJson,
-        seizureEventsJson, volatilityJson, titrationJson, dailySeizuresJson,
+        seizureEventsJson,
         skippedEventsJson,
     )
     outFile.writeText(html)
@@ -277,13 +197,7 @@ private fun buildHtmlTemplate(
     rawDrugDataJson: String,
     totalSmall: Int,
     totalBig: Int,
-    lagCorrelationsJson: String,
-    cusumCurveJson: String,
-    changePointsJson: String,
     seizureEventsJson: String,
-    volatilityJson: String,
-    titrationJson: String,
-    dailySeizuresJson: String,
     skippedEventsJson: String,
 ): String = """
 <!DOCTYPE html>
@@ -526,7 +440,7 @@ private fun buildHtmlTemplate(
         .tab-content { display: none; }
         .tab-content.active { display: block; }
 
-        /* ── Lag tab ── */
+        /* ── Tab content shell ── */
         .lag-content {
             max-width: 1100px;
             margin: 0 auto;
@@ -553,58 +467,6 @@ private fun buildHtmlTemplate(
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: var(--radius);
-        }
-
-        #lagChart, #cusumChart, #volScatter {
-            width: 100%;
-            height: 400px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            margin-bottom: 24px;
-        }
-
-        #titrationChart {
-            width: 100%;
-            height: 450px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            margin-bottom: 24px;
-        }
-
-        .drug-selector {
-            display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
-            margin-bottom: 16px;
-        }
-
-        .drug-selector button {
-            padding: 4px 12px;
-            font-size: 12px;
-            font-weight: 500;
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            background: var(--surface);
-            color: var(--text-muted);
-            cursor: pointer;
-            transition: all .15s;
-        }
-
-        .drug-selector button.active {
-            background: var(--accent);
-            color: #fff;
-            border-color: var(--accent);
-        }
-
-        #volTimeline {
-            width: 100%;
-            height: 120px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            margin-bottom: 24px;
         }
 
         .lag-content table {
@@ -636,10 +498,7 @@ private fun buildHtmlTemplate(
         }
 
         .lag-content tr:last-child td { border-bottom: none; }
-        .lag-content .good { color: #16a34a; }
-        .lag-content .bad { color: #dc2626; }
         .lag-content .muted { color: var(--text-muted); }
-        .lag-content .best { font-weight: 700; }
 
         /* ── Calendar tab ── */
         .cal-wrap { max-width: none; }
@@ -797,10 +656,6 @@ private fun buildHtmlTemplate(
     <!-- Tab bar -->
     <div class="tab-bar" id="tabBar">
         <button class="active" data-tab="timeline">Timeline</button>
-        <button data-tab="lag">Lag Analysis</button>
-        <button data-tab="changepoints">Change Points</button>
-        <button data-tab="volatility">Volatility</button>
-        <button data-tab="titration">Titrations</button>
         <button data-tab="calendar">Calendar</button>
         <button data-tab="events">Events</button>
     </div>
@@ -821,89 +676,6 @@ private fun buildHtmlTemplate(
         <div class="dist-row">
             <div id="hourChart"></div>
             <div id="dowChart"></div>
-        </div>
-    </div>
-
-    <!-- Tab: Lag Analysis -->
-    <div id="tab-lag" class="tab-content">
-        <div class="lag-content">
-            <p class="note">
-                Medications don&rsquo;t work instantly &mdash; some take days or weeks to kick in.
-                This asks: &ldquo;If we gave a drug today, do seizures drop 3 days later? 7 days? 14 days?&rdquo;
-                For each drug and each delay, we take the dose on a given day and compare it to
-                the total number of seizures over a window starting at that delay.
-                The window size is different for each drug, matched to how long it takes to reach steady state
-                (e.g. 5 days for Orfiril, 21 days for Fycompa).
-                The strength of that link is measured as a score <b>r</b> (ranging from &minus;1 to +1).
-                <b style="color:#16a34a">Negative r (green)</b> = when the dose goes up, seizures tend to go down &mdash; the drug seems to help.
-                <b style="color:#dc2626">Positive r (red)</b> = seizures tend to go up with the dose &mdash; no benefit seen (or seizures were already rising when the dose was increased).
-                The delay with the strongest green value tells you roughly how long that drug takes to show its effect.
-                This is a statistical pattern, not proof of cause and effect.
-            </p>
-            <div id="lagChart"></div>
-            <div id="lagTable"></div>
-        </div>
-    </div>
-
-    <!-- Tab: Change Points -->
-    <div id="tab-changepoints" class="tab-content">
-        <div class="lag-content">
-            <p class="note">
-                <strong>What is this?</strong>
-                The line goes up on bad days and down on good days. Where it drifts far enough
-                to matter, a dot appears:
-                <b style="color:#16a34a">green ▼</b> = things got better,
-                <b style="color:#dc2626">red ▲</b> = things got worse.
-                This finds when seizures <em>actually</em> shifted &mdash; which may or may not
-                line up with a drug change. Dashed vertical lines show drug changes for comparison.
-            </p>
-            <p class="note">
-                <strong>Reading the table:</strong>
-                &ldquo;Magnitude&rdquo; = how big the shift was.
-                &ldquo;Nearest Drug Change&rdquo; = the closest medication adjustment &mdash;
-                if blank, the shift happened without any recent drug change.
-            </p>
-            <div id="cusumChart"></div>
-            <div id="cusumTable"></div>
-        </div>
-    </div>
-
-    <!-- Tab: Volatility -->
-    <div id="tab-volatility" class="tab-content">
-        <div class="lag-content">
-            <p class="note">
-                Two drug regimens might both average 1 seizure per day, but one has steady 1-per-day
-                while the other has 0 for a week then 7 in one day. This tells them apart.
-                <b>CV</b> (coefficient of variation) measures how unpredictable seizures are &mdash;
-                lower is more stable.
-                <b>Dispersion</b> shows clustering: &gt;&thinsp;1 means seizures come in bursts,
-                &asymp;&thinsp;1 means random, &lt;&thinsp;1 means unusually regular.
-                The scatter plot puts each regimen on a map: <b style="color:#16a34a">bottom-left</b>
-                (few seizures, low volatility) is the sweet spot.
-                <b style="color:#dc2626">Red blocks</b> on the timeline below mark burst episodes &mdash;
-                clusters of unusually bad days.
-            </p>
-            <div id="volScatter"></div>
-            <div id="volTimeline"></div>
-            <div id="volTable"></div>
-        </div>
-    </div>
-
-    <!-- Tab: Titrations -->
-    <div id="tab-titration" class="tab-content">
-        <div class="lag-content">
-            <p class="note">
-                When a drug is increased or decreased, the doctor does it in steps over days or weeks.
-                This scores each ramp-up or ramp-down: was it done fast or slow? Did seizures get worse
-                during the transition? Did things stabilize after?
-                The <b>step-line</b> shows dosage changes over time, with <b>daily seizures</b> overlaid.
-                <b style="color:#16a34a">Green</b> bands = seizures improved after,
-                <b style="color:#dc2626">red</b> = worsened,
-                <b style="color:#eab308">yellow</b> = unchanged.
-            </p>
-            <div class="drug-selector" id="titrationDrugSelector"></div>
-            <div id="titrationChart"></div>
-            <div id="titrationTable"></div>
         </div>
     </div>
 
@@ -1384,23 +1156,12 @@ private fun buildHtmlTemplate(
             window.addEventListener('resize', () => dowChart.resize());
         })();
 
-        const lagCorrelations = $lagCorrelationsJson;
-        const cusumCurve = $cusumCurveJson;
-        const changePointsData = $changePointsJson;
-        const volatilityData = $volatilityJson;
-        const titrationData = $titrationJson;
-        const dailySeizures = $dailySeizuresJson;
         const skippedEvents = $skippedEventsJson;
 
         // ── Tab switching ──
-        let lagChartInstance = null;
-        let cusumChartInstance = null;
-        let volScatterInstance = null;
-        let volTimelineInstance = null;
-        let titrationChartInstance = null;
         let eventsRendered = false;
         let calendarRendered = false;
-        const KNOWN_TABS = ['timeline','lag','changepoints','volatility','titration','calendar','events'];
+        const KNOWN_TABS = ['timeline','calendar','events'];
 
         function activateTab(name) {
             if (!KNOWN_TABS.includes(name)) name = 'timeline';
@@ -1412,22 +1173,6 @@ private fun buildHtmlTemplate(
             });
             if (name === 'timeline') {
                 chart.resize();
-            }
-            if (name === 'lag') {
-                if (!lagChartInstance) initLagTab();
-                else lagChartInstance.resize();
-            }
-            if (name === 'changepoints') {
-                if (!cusumChartInstance) initChangePointsTab();
-                else cusumChartInstance.resize();
-            }
-            if (name === 'volatility') {
-                if (!volScatterInstance) initVolatilityTab();
-                else { volScatterInstance.resize(); if (volTimelineInstance) volTimelineInstance.resize(); }
-            }
-            if (name === 'titration') {
-                if (!titrationChartInstance) initTitrationTab();
-                else titrationChartInstance.resize();
             }
             if (name === 'events' && !eventsRendered) {
                 initEventsTab();
@@ -1575,512 +1320,6 @@ private fun buildHtmlTemplate(
                     ' had no parseable time and were placed in the day row.';
             }
             foot.innerHTML = footHtml;
-        }
-
-        // ── Lag Analysis tab ──
-        function initLagTab() {
-            const lagColors = ['#2563eb', '#16a34a', '#ea580c', '#0891b2', '#c026d3', '#92400e'];
-
-            // Group by drug
-            const byDrug = {};
-            lagCorrelations.forEach(d => {
-                if (!byDrug[d.drug]) byDrug[d.drug] = [];
-                byDrug[d.drug].push(d);
-            });
-            const lagDrugs = Object.keys(byDrug).sort();
-            const lags = [...new Set(lagCorrelations.map(d => d.lag))].sort((a, b) => a - b);
-
-            // ECharts line chart
-            lagChartInstance = echarts.init(document.getElementById('lagChart'));
-            lagChartInstance.setOption({
-                tooltip: {
-                    trigger: 'axis',
-                    formatter: params => {
-                        let html = '<b>Lag ' + params[0].axisValue + '</b><br/>';
-                        params.forEach(p => {
-                            html += p.marker + ' ' + p.seriesName + ': <b>' + p.value.toFixed(3) + '</b><br/>';
-                        });
-                        return html;
-                    }
-                },
-                legend: { top: 8, textStyle: { fontSize: 12 } },
-                grid: { top: 50, left: 60, right: 30, bottom: 40 },
-                xAxis: {
-                    type: 'category',
-                    data: lags.map(l => l + 'd'),
-                    name: 'Lag (days)',
-                    nameLocation: 'middle',
-                    nameGap: 28,
-                    axisLabel: { fontSize: 12 },
-                },
-                yAxis: {
-                    type: 'value',
-                    name: 'Pearson r',
-                    nameLocation: 'middle',
-                    nameGap: 42,
-                    axisLabel: { fontSize: 11 },
-                    splitLine: { lineStyle: { type: 'dashed', color: '#e2e8f0' } },
-                },
-                series: lagDrugs.map((drug, i) => ({
-                    name: drug,
-                    type: 'line',
-                    data: lags.map(lag => {
-                        const entry = byDrug[drug].find(d => d.lag === lag);
-                        return entry ? entry.r : null;
-                    }),
-                    smooth: true,
-                    symbol: 'circle',
-                    symbolSize: 8,
-                    lineStyle: { width: 2.5 },
-                    itemStyle: { color: lagColors[i % lagColors.length] },
-                })),
-            });
-            window.addEventListener('resize', () => { if (lagChartInstance) lagChartInstance.resize(); });
-
-            // Table
-            const el = document.getElementById('lagTable');
-            if (lagCorrelations.length === 0) { el.innerHTML = '<p class="muted">No lag correlations computed.</p>'; return; }
-
-            let html = '<table><tr><th>Drug</th><th>Window</th>';
-            lags.forEach(l => { html += '<th>' + l + 'd lag</th>'; });
-            html += '<th>Best lag</th><th>Samples</th></tr>';
-
-            lagDrugs.forEach(drug => {
-                const entries = byDrug[drug].sort((a, b) => a.lag - b.lag);
-                let best = entries[0];
-                entries.forEach(e => { if (e.r < best.r) best = e; });
-
-                html += '<tr><td><strong>' + drug + '</strong></td>';
-                html += '<td class="muted">' + entries[0].w + 'd</td>';
-                entries.forEach(e => {
-                    const cls = e.r < -0.1 ? 'good' : (e.r > 0.1 ? 'bad' : 'muted');
-                    const bold = e.lag === best.lag ? ' best' : '';
-                    html += '<td class="' + cls + bold + '">' + e.r.toFixed(3) + '</td>';
-                });
-                const bestCls = best.r < -0.1 ? 'good' : 'muted';
-                html += '<td class="' + bestCls + ' best">' + best.lag + 'd (r=' + best.r.toFixed(3) + ')</td>';
-                html += '<td class="muted">' + entries[0].n + '</td></tr>';
-            });
-            html += '</table>';
-            el.innerHTML = html;
-        }
-
-        // ── Change Points tab ──
-        function initChangePointsTab() {
-            cusumChartInstance = echarts.init(document.getElementById('cusumChart'));
-
-            // Scatter data for change points
-            const decreaseData = [];
-            const increaseData = [];
-            changePointsData.forEach(cp => {
-                const item = [cp.date, cp.cusum, cp.magnitude, cp.drugs, cp.drugChange, cp.direction];
-                if (cp.direction === 'DECREASE') decreaseData.push(item);
-                else increaseData.push(item);
-            });
-
-            const series = [
-                {
-                    name: 'CUSUM',
-                    type: 'line',
-                    data: cusumCurve.map(d => [d.date, d.cusum]),
-                    smooth: true,
-                    showSymbol: false,
-                    lineStyle: { width: 2, color: '#3b82f6' },
-                    itemStyle: { color: '#3b82f6' },
-                },
-                {
-                    name: 'Improvement',
-                    type: 'scatter',
-                    data: decreaseData,
-                    symbolSize: 14,
-                    itemStyle: { color: '#16a34a' },
-                    z: 10,
-                },
-                {
-                    name: 'Worsening',
-                    type: 'scatter',
-                    data: increaseData,
-                    symbolSize: 14,
-                    itemStyle: { color: '#ef4444' },
-                    z: 10,
-                },
-            ];
-
-            cusumChartInstance.setOption({
-                tooltip: {
-                    trigger: 'item',
-                    formatter: function(params) {
-                        if (params.seriesType === 'line') {
-                            return '<b>' + params.value[0] + '</b><br/>CUSUM: ' + params.value[1].toFixed(1);
-                        }
-                        const d = params.value;
-                        let html = '<b>' + d[0] + '</b><br/>';
-                        html += 'Direction: <b style="color:' + (d[5] === 'DECREASE' ? '#16a34a' : '#ef4444') + '">';
-                        html += (d[5] === 'DECREASE' ? '▼ Improvement' : '▲ Worsening') + '</b><br/>';
-                        html += 'Magnitude: ' + d[2].toFixed(1) + '<br/>';
-                        html += 'Active drugs: ' + d[3] + '<br/>';
-                        if (d[4]) html += 'Nearest drug change: ' + d[4];
-                        return html;
-                    }
-                },
-                legend: { top: 8, textStyle: { fontSize: 12 } },
-                grid: { top: 50, left: 60, right: 30, bottom: 40 },
-                xAxis: {
-                    type: 'time',
-                    axisLabel: { fontSize: 11 },
-                },
-                yAxis: {
-                    type: 'value',
-                    name: 'Cumulative Sum',
-                    nameLocation: 'middle',
-                    nameGap: 48,
-                    axisLabel: { fontSize: 11 },
-                    splitLine: { lineStyle: { type: 'dashed', color: '#e2e8f0' } },
-                },
-                series: series,
-            });
-            window.addEventListener('resize', () => { if (cusumChartInstance) cusumChartInstance.resize(); });
-
-            // Table
-            const el = document.getElementById('cusumTable');
-            if (changePointsData.length === 0) {
-                el.innerHTML = '<p class="muted">No significant change points detected.</p>';
-                return;
-            }
-
-            let html = '<table><tr><th>Date</th><th>Direction</th><th>Magnitude</th><th>Active Drugs</th><th>Nearest Drug Change</th></tr>';
-            changePointsData.forEach(cp => {
-                const dirCls = cp.direction === 'DECREASE' ? 'good' : 'bad';
-                const arrow = cp.direction === 'DECREASE' ? '▼ Improvement' : '▲ Worsening';
-                html += '<tr>';
-                html += '<td>' + cp.date + '</td>';
-                html += '<td class="' + dirCls + '"><strong>' + arrow + '</strong></td>';
-                html += '<td>' + cp.magnitude.toFixed(1) + '</td>';
-                html += '<td>' + cp.drugs + '</td>';
-                html += '<td>' + (cp.drugChange || '<span class="muted">none nearby</span>') + '</td>';
-                html += '</tr>';
-            });
-            html += '</table>';
-            el.innerHTML = html;
-        }
-
-        // ── Volatility tab ──
-        function initVolatilityTab() {
-            const el = document.getElementById('volTable');
-            if (volatilityData.length === 0) {
-                el.innerHTML = '<p class="muted">No regimens long enough for volatility analysis.</p>';
-                return;
-            }
-
-            // Scatter plot: avg seizures vs CV, dot size = days
-            volScatterInstance = echarts.init(document.getElementById('volScatter'));
-            const scatterData = volatilityData.map((v, i) => ({
-                value: [v.avg, v.cv, v.days, v.dosages, v.startDate, v.endDate, v.di],
-                symbolSize: Math.max(8, Math.min(40, Math.sqrt(v.days) * 3)),
-            }));
-
-            volScatterInstance.setOption({
-                tooltip: {
-                    trigger: 'item',
-                    formatter: function(p) {
-                        const d = p.value;
-                        let html = '<b>' + d[3] + '</b><br/>';
-                        html += d[4] + ' — ' + d[5] + ' (' + d[2] + ' days)<br/>';
-                        html += 'Avg seizures/day: ' + d[0].toFixed(2) + '<br/>';
-                        html += 'CV: ' + d[1].toFixed(2) + '<br/>';
-                        html += 'Dispersion: ' + d[6].toFixed(2);
-                        return html;
-                    }
-                },
-                grid: { top: 40, left: 70, right: 30, bottom: 50 },
-                xAxis: {
-                    type: 'value',
-                    name: 'Avg daily seizures',
-                    nameLocation: 'middle',
-                    nameGap: 30,
-                    axisLabel: { fontSize: 11 },
-                    splitLine: { lineStyle: { type: 'dashed', color: '#e2e8f0' } },
-                },
-                yAxis: {
-                    type: 'value',
-                    name: 'Coefficient of Variation',
-                    nameLocation: 'middle',
-                    nameGap: 50,
-                    axisLabel: { fontSize: 11 },
-                    splitLine: { lineStyle: { type: 'dashed', color: '#e2e8f0' } },
-                },
-                visualMap: {
-                    show: false,
-                    dimension: 0,
-                    min: 0,
-                    max: Math.max(...volatilityData.map(v => v.avg), 1),
-                    inRange: { color: ['#16a34a', '#eab308', '#ef4444'] },
-                },
-                series: [{
-                    type: 'scatter',
-                    data: scatterData,
-                    emphasis: { itemStyle: { borderColor: '#000', borderWidth: 2 } },
-                }],
-            });
-            window.addEventListener('resize', () => { if (volScatterInstance) volScatterInstance.resize(); });
-
-            // Burst timeline: all bursts across all regimens
-            const allBursts = [];
-            volatilityData.forEach(v => {
-                v.bursts.forEach(b => allBursts.push(b));
-            });
-
-            if (allBursts.length > 0) {
-                volTimelineInstance = echarts.init(document.getElementById('volTimeline'));
-                const timelineData = allBursts.map(b => ({
-                    value: [b.start, b.end, b.days, b.seizures, b.drugs],
-                    itemStyle: { color: '#ef4444', opacity: 0.7 },
-                }));
-
-                volTimelineInstance.setOption({
-                    tooltip: {
-                        trigger: 'item',
-                        formatter: function(p) {
-                            const d = p.value;
-                            return '<b>Burst</b><br/>' + d[0] + ' — ' + d[1] +
-                                ' (' + d[2] + ' days)<br/>' +
-                                'Seizures: ' + d[3] + '<br/>' +
-                                'Active drugs: ' + d[4];
-                        }
-                    },
-                    title: { text: 'Burst Episodes', textStyle: { fontSize: 13, fontWeight: 500, color: '#64748b' }, left: 16, top: 8 },
-                    grid: { top: 40, left: 70, right: 30, bottom: 30 },
-                    xAxis: { type: 'time', axisLabel: { fontSize: 11 } },
-                    yAxis: {
-                        type: 'value', show: false, min: 0, max: 1,
-                    },
-                    series: [{
-                        type: 'custom',
-                        renderItem: function(params, api) {
-                            const start = api.coord([api.value(0), 0.5]);
-                            const end = api.coord([api.value(1), 0.5]);
-                            const height = api.size([0, 0.6])[1];
-                            return {
-                                type: 'rect',
-                                shape: {
-                                    x: start[0],
-                                    y: start[1] - height / 2,
-                                    width: Math.max(end[0] - start[0], 4),
-                                    height: height,
-                                },
-                                style: api.style(),
-                            };
-                        },
-                        encode: { x: [0, 1] },
-                        data: timelineData,
-                    }],
-                });
-                window.addEventListener('resize', () => { if (volTimelineInstance) volTimelineInstance.resize(); });
-            }
-
-            // Table
-            let html = '<table><tr><th>Regimen</th><th>Period</th><th>Days</th><th>Avg/day</th><th>CV</th><th>Dispersion</th><th>Bursts</th></tr>';
-            volatilityData.forEach(v => {
-                const cvCls = v.cv < 0.5 ? 'good' : (v.cv > 1.5 ? 'bad' : '');
-                const diCls = v.di < 1.0 ? 'good' : (v.di > 2.0 ? 'bad' : '');
-                const diLabel = v.di > 1.0 ? 'bursty' : (v.di < 0.8 ? 'regular' : 'random');
-                html += '<tr>';
-                html += '<td><strong>' + v.dosages + '</strong></td>';
-                html += '<td class="muted">' + v.startDate + ' — ' + v.endDate + '</td>';
-                html += '<td>' + v.days + '</td>';
-                html += '<td>' + v.avg.toFixed(2) + '</td>';
-                html += '<td class="' + cvCls + '">' + v.cv.toFixed(2) + '</td>';
-                html += '<td class="' + diCls + '">' + v.di.toFixed(2) + ' <span class="muted">(' + diLabel + ')</span></td>';
-                html += '<td>' + v.bursts.length + '</td>';
-                html += '</tr>';
-            });
-            html += '</table>';
-            el.innerHTML = html;
-        }
-
-        // ── Titration tab ──
-        function initTitrationTab() {
-            const el = document.getElementById('titrationTable');
-            if (titrationData.length === 0) {
-                el.innerHTML = '<p class="muted">No titration sequences detected (need at least 2 consecutive dose changes in the same direction).</p>';
-                return;
-            }
-
-            const drugColors = ['#2563eb', '#16a34a', '#ea580c', '#0891b2', '#c026d3', '#92400e'];
-            const allDrugs = [...new Set(titrationData.map(t => t.drug))].sort();
-            const drugColorMap = {};
-            allDrugs.forEach((d, i) => { drugColorMap[d] = drugColors[i % drugColors.length]; });
-
-            // Drug selector buttons
-            const selectorEl = document.getElementById('titrationDrugSelector');
-            let selectedDrug = allDrugs[0];
-            allDrugs.forEach(drug => {
-                const btn = document.createElement('button');
-                btn.textContent = drug;
-                if (drug === selectedDrug) btn.classList.add('active');
-                btn.addEventListener('click', () => {
-                    selectorEl.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    selectedDrug = drug;
-                    renderTitrationChart(drug);
-                });
-                selectorEl.appendChild(btn);
-            });
-
-            titrationChartInstance = echarts.init(document.getElementById('titrationChart'));
-
-            function renderTitrationChart(drug) {
-                const drugTrajectories = titrationData.filter(t => t.drug === drug);
-                if (drugTrajectories.length === 0) {
-                    titrationChartInstance.clear();
-                    return;
-                }
-
-                // Collect all dates involved (steps + daily seizures in range)
-                let minDate = drugTrajectories[0].startDate;
-                let maxDate = drugTrajectories[0].endDate;
-                drugTrajectories.forEach(t => {
-                    if (t.startDate < minDate) minDate = t.startDate;
-                    // Extend to 14 days after end for stability view
-                    const afterEnd = addDays(t.endDate, 14);
-                    if (afterEnd > maxDate) maxDate = afterEnd;
-                });
-
-                // Build dosage step-line data from all trajectories
-                const doseData = [];
-                drugTrajectories.forEach(t => {
-                    t.steps.forEach((s, i) => {
-                        if (i === 0) {
-                            doseData.push([s.date, s.before]);
-                        }
-                        doseData.push([s.date, s.after]);
-                    });
-                });
-                doseData.sort((a, b) => a[0].localeCompare(b[0]));
-
-                // Build daily seizure data for the date range
-                const seizureData = [];
-                let d = minDate;
-                while (d <= maxDate) {
-                    if (dailySeizures[d] !== undefined) {
-                        seizureData.push([d, dailySeizures[d]]);
-                    }
-                    d = addDays(d, 1);
-                }
-
-                // Mark pieces: bands for each trajectory
-                const markAreas = drugTrajectories.map(t => {
-                    const improved = t.avgAfter < t.avgDuring * 0.9;
-                    const worsened = t.avgAfter > t.avgDuring * 1.1;
-                    const color = improved ? 'rgba(22,163,74,0.10)' : (worsened ? 'rgba(220,38,38,0.10)' : 'rgba(234,179,8,0.10)');
-                    return [{
-                        xAxis: t.startDate,
-                        itemStyle: { color: color },
-                    }, {
-                        xAxis: t.endDate,
-                    }];
-                });
-
-                titrationChartInstance.setOption({
-                    tooltip: {
-                        trigger: 'axis',
-                        formatter: function(params) {
-                            let html = '<b>' + params[0].axisValue + '</b><br/>';
-                            params.forEach(p => {
-                                html += p.marker + ' ' + p.seriesName + ': <b>' + (typeof p.value[1] === 'number' ? p.value[1].toFixed(1) : '—') + '</b><br/>';
-                            });
-                            return html;
-                        }
-                    },
-                    legend: { top: 8, textStyle: { fontSize: 12 } },
-                    grid: { top: 50, left: 70, right: 70, bottom: 40 },
-                    xAxis: {
-                        type: 'time',
-                        min: minDate,
-                        max: maxDate,
-                        axisLabel: { fontSize: 11 },
-                    },
-                    yAxis: [
-                        {
-                            type: 'value',
-                            name: 'Dosage (total)',
-                            nameLocation: 'middle',
-                            nameGap: 50,
-                            position: 'left',
-                            axisLabel: { fontSize: 11 },
-                            splitLine: { lineStyle: { type: 'dashed', color: '#e2e8f0' } },
-                        },
-                        {
-                            type: 'value',
-                            name: 'Daily seizures',
-                            nameLocation: 'middle',
-                            nameGap: 50,
-                            position: 'right',
-                            axisLabel: { fontSize: 11 },
-                            splitLine: { show: false },
-                        },
-                    ],
-                    series: [
-                        {
-                            name: 'Dosage',
-                            type: 'line',
-                            step: 'end',
-                            yAxisIndex: 0,
-                            data: doseData,
-                            lineStyle: { width: 3, color: drugColorMap[drug] },
-                            itemStyle: { color: drugColorMap[drug] },
-                            symbol: 'circle',
-                            symbolSize: 8,
-                            markArea: { silent: true, data: markAreas },
-                        },
-                        {
-                            name: 'Seizures',
-                            type: 'line',
-                            smooth: true,
-                            yAxisIndex: 1,
-                            data: seizureData,
-                            lineStyle: { width: 1.5, color: '#94a3b8', type: 'dashed' },
-                            itemStyle: { color: '#94a3b8' },
-                            showSymbol: false,
-                            areaStyle: { opacity: 0.06, color: '#94a3b8' },
-                        },
-                    ],
-                }, true);
-            }
-
-            renderTitrationChart(selectedDrug);
-            window.addEventListener('resize', () => { if (titrationChartInstance) titrationChartInstance.resize(); });
-
-            // Summary table
-            let html = '<table><tr><th>Drug</th><th>Direction</th><th>Period</th><th>Steps</th><th>Pace</th><th>Avg gap</th><th>Slope during</th><th>Avg during</th><th>Avg after</th><th>Outcome</th></tr>';
-            titrationData.forEach(t => {
-                const improved = t.avgAfter < t.avgDuring * 0.9;
-                const worsened = t.avgAfter > t.avgDuring * 1.1;
-                const outcome = improved ? 'improved' : (worsened ? 'worsened' : 'stable');
-                const outcomeCls = improved ? 'good' : (worsened ? 'bad' : '');
-                const dirIcon = t.direction === 'UP' ? '\u2191' : '\u2193';
-                const paceCls = t.pace === 'FAST' ? 'bad' : (t.pace === 'SLOW' ? 'good' : '');
-                html += '<tr>';
-                html += '<td><strong>' + t.drug + '</strong></td>';
-                html += '<td>' + dirIcon + ' ' + t.direction.toLowerCase() + '</td>';
-                html += '<td class="muted">' + t.startDate + ' — ' + t.endDate + '</td>';
-                html += '<td>' + t.steps.length + '</td>';
-                html += '<td class="' + paceCls + '">' + t.pace.toLowerCase() + '</td>';
-                html += '<td>' + t.avgGap.toFixed(1) + 'd</td>';
-                html += '<td>' + t.slopeDuring.toFixed(3) + '</td>';
-                html += '<td>' + t.avgDuring.toFixed(2) + '</td>';
-                html += '<td>' + t.avgAfter.toFixed(2) + '</td>';
-                html += '<td class="' + outcomeCls + '"><strong>' + outcome + '</strong></td>';
-                html += '</tr>';
-            });
-            html += '</table>';
-            el.innerHTML = html;
-        }
-
-        function addDays(dateStr, days) {
-            const d = new Date(dateStr);
-            d.setDate(d.getDate() + days);
-            return d.toISOString().split('T')[0];
         }
 
     </script>

@@ -11,8 +11,4 @@ internal fun runAnalysis(rows: List<DailyRow>, categorized: CategorizedEvents): 
         monthlyTrend = computeMonthlyTrend(rows),
         seizureFreeStreaks = analyzeStreaks(rows),
         drugCorrelations = computeDrugCorrelations(rows),
-        lagCorrelations = computeLagCorrelations(rows),
-        changePoints = detectChangePoints(rows, categorized),
-        volatilityAnalysis = analyzeVolatility(rows),
-        titrationTrajectories = analyzeTitrations(rows, categorized),
     )
