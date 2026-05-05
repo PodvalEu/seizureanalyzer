@@ -1400,42 +1400,62 @@ private fun buildHtmlTemplate(
         let titrationChartInstance = null;
         let eventsRendered = false;
         let calendarRendered = false;
+        const KNOWN_TABS = ['timeline','lag','changepoints','volatility','titration','calendar','events'];
+
+        function activateTab(name) {
+            if (!KNOWN_TABS.includes(name)) name = 'timeline';
+            document.querySelectorAll('.tab-bar button').forEach(b => {
+                b.classList.toggle('active', b.dataset.tab === name);
+            });
+            document.querySelectorAll('.tab-content').forEach(t => {
+                t.classList.toggle('active', t.id === 'tab-' + name);
+            });
+            if (name === 'timeline') {
+                chart.resize();
+            }
+            if (name === 'lag') {
+                if (!lagChartInstance) initLagTab();
+                else lagChartInstance.resize();
+            }
+            if (name === 'changepoints') {
+                if (!cusumChartInstance) initChangePointsTab();
+                else cusumChartInstance.resize();
+            }
+            if (name === 'volatility') {
+                if (!volScatterInstance) initVolatilityTab();
+                else { volScatterInstance.resize(); if (volTimelineInstance) volTimelineInstance.resize(); }
+            }
+            if (name === 'titration') {
+                if (!titrationChartInstance) initTitrationTab();
+                else titrationChartInstance.resize();
+            }
+            if (name === 'events' && !eventsRendered) {
+                initEventsTab();
+                eventsRendered = true;
+            }
+            if (name === 'calendar' && !calendarRendered) {
+                initCalendarTab();
+                calendarRendered = true;
+            }
+        }
+
         document.querySelectorAll('.tab-bar button').forEach(btn => {
             btn.addEventListener('click', () => {
-                document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-                btn.classList.add('active');
-                document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-
-                if (btn.dataset.tab === 'timeline') {
-                    chart.resize();
-                }
-                if (btn.dataset.tab === 'lag') {
-                    if (!lagChartInstance) initLagTab();
-                    else lagChartInstance.resize();
-                }
-                if (btn.dataset.tab === 'changepoints') {
-                    if (!cusumChartInstance) initChangePointsTab();
-                    else cusumChartInstance.resize();
-                }
-                if (btn.dataset.tab === 'volatility') {
-                    if (!volScatterInstance) initVolatilityTab();
-                    else { volScatterInstance.resize(); if (volTimelineInstance) volTimelineInstance.resize(); }
-                }
-                if (btn.dataset.tab === 'titration') {
-                    if (!titrationChartInstance) initTitrationTab();
-                    else titrationChartInstance.resize();
-                }
-                if (btn.dataset.tab === 'events' && !eventsRendered) {
-                    initEventsTab();
-                    eventsRendered = true;
-                }
-                if (btn.dataset.tab === 'calendar' && !calendarRendered) {
-                    initCalendarTab();
-                    calendarRendered = true;
+                const name = btn.dataset.tab;
+                if (location.hash.slice(1) === name) {
+                    activateTab(name);
+                } else {
+                    location.hash = name;
                 }
             });
         });
+
+        window.addEventListener('hashchange', () => activateTab(location.hash.slice(1)));
+
+        const initialTab = location.hash.slice(1);
+        if (initialTab && initialTab !== 'timeline' && KNOWN_TABS.includes(initialTab)) {
+            activateTab(initialTab);
+        }
 
         // ── Events tab (skipped events) ──
         function initEventsTab() {
