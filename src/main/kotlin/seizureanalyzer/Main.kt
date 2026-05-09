@@ -18,7 +18,6 @@ import seizureanalyzer.calendar.listAllEvents
 import seizureanalyzer.calendar.resolveCalendarId
 import seizureanalyzer.output.resolveEventsJsonOut
 import seizureanalyzer.output.writeChatGptSummary
-import seizureanalyzer.output.writeDailyCsv
 import seizureanalyzer.output.writeLlmCsv
 import seizureanalyzer.output.writeEventsCsv
 import seizureanalyzer.output.writeEventsJson
@@ -32,9 +31,6 @@ class App : CliktCommand(name = "seizureanalyzer") {
 
     private val credentialsDir by option("--credentials-dir", help = "Directory to store OAuth tokens")
         .default(Config.credentialsDir)
-
-    private val csvOut by option("--csv-out", help = "Daily aggregate CSV file path")
-        .default(Config.csvOut)
 
     private val reportHtml by option("--report-html", help = "Standalone HTML report output path")
         .default(Config.reportHtml)
@@ -79,12 +75,10 @@ class App : CliktCommand(name = "seizureanalyzer") {
             "${analysis.monthlyTrend.size} months, " +
             "${analysis.seizureFreeStreaks.size} streaks")
 
-        writeDailyCsv(dailyRows, drugs, File(csvOut))
-        writeLlmCsv(dailyRows, drugs, categorized.seizureEvents, File(Config.llmCsvOut))
+        writeLlmCsv(dailyRows, drugs, File(Config.llmCsvOut))
         val reportPath = writeHtmlReport(dailyRows, drugs, categorized, File(reportHtml))
         val summaryPath = writeChatGptSummary(dailyRows, categorized, analysis, File(summaryJsonOut))
 
-        echo("Daily CSV: ${File(csvOut).absolutePath}")
         echo("LLM CSV: ${File(Config.llmCsvOut).absolutePath}")
         echo("HTML report: ${reportPath.absolutePath}")
         echo("Summary JSON: $summaryPath")

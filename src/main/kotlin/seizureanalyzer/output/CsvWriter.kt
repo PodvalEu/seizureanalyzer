@@ -1,94 +1,101 @@
 package seizureanalyzer.output
 
+import com.github.doyaaaaaken.kotlincsv.dsl.csvWriter
 import com.google.api.services.calendar.model.Event
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import seizureanalyzer.Config
 import seizureanalyzer.calendar.toInstant
 import seizureanalyzer.model.DailyRow
-import seizureanalyzer.model.SeizureEvent
 import seizureanalyzer.parsing.extractHour
 import seizureanalyzer.parsing.formatNumber
 import seizureanalyzer.parsing.slugify
 import java.io.File
 
-internal fun writeDailyCsv(rows: List<DailyRow>, drugs: List<String>, outFile: File) {
+private val ROLLING_WINDOWS_LLM = listOf(7, 30)
+
+internal fun writeLlmCsv(rows: List<DailyRow>, drugs: List<String>, outFile: File) {
     outFile.parentFile?.mkdirs()
+
+    val backward = computeBackwardRolling(rows, ROLLING_WINDOWS_LLM)
+    val regimenIds = computeRegimenIds(rows, drugs)
+
     val headers = buildList {
         add("date")
+        add("dow")
+        add("small")
+        add("big")
+        add("seizure_free")
+        ROLLING_WINDOWS_LLM.forEach { w ->
+            add("small_${w}d")
+            add("big_${w}d")
+        }
         drugs.forEach { drug ->
             val slug = slugify(drug)
-            add("drug_$slug")
-            add("drug_${slug}_morning")
-            add("drug_${slug}_noon")
-            add("drug_${slug}_evening")
+            add("${slug}_mg")
+            add("${slug}_mne")
         }
-        add("small_seizures")
-        add("big_seizures")
-        Config.rollingWindows.forEach { window ->
-            add("small_seizures_forward_${window}d")
-            add("big_seizures_forward_${window}d")
-        }
+        add("regimen_id")
     }
 
-    com.github.doyaaaaaken.kotlincsv.dsl.csvWriter().open(outFile) {
+    csvWriter().open(outFile) {
         writeRow(headers)
-        rows.forEach { row ->
+        rows.forEachIndexed { idx, row ->
             val values = mutableListOf<String>()
             values += row.date.toString()
-            drugs.forEach { drug ->
-                val dosage = row.drugDosages[drug]
-                values += (dosage?.formatTriple() ?: "")
-                values += formatNumber(dosage?.morning)
-                values += formatNumber(dosage?.noon)
-                values += formatNumber(dosage?.evening)
-            }
+            values += row.date.dayOfWeek.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
             values += row.smallSeizures.toString()
             values += row.bigSeizures.toString()
-            Config.rollingWindows.forEach { window ->
-                values += row.getForwardSmall(window).toString()
-                values += row.getForwardBig(window).toString()
+            values += ((row.smallSeizures + row.bigSeizures) == 0).toString()
+            ROLLING_WINDOWS_LLM.forEach { w ->
+                val (s, b) = backward.getValue(w)[idx]
+                values += s.toString()
+                values += b.toString()
             }
+            drugs.forEach { drug ->
+                val dosage = row.drugDosages[drug]
+                values += formatNumber(dosage?.total())
+                values += (dosage?.formatTriple() ?: "")
+            }
+            values += regimenIds[idx].toString()
             writeRow(values)
         }
     }
 }
 
-internal fun writeLlmCsv(rows: List<DailyRow>, drugs: List<String>, seizureEvents: List<SeizureEvent>, outFile: File) {
-    outFile.parentFile?.mkdirs()
-    val hoursByDate = seizureEvents.groupBy { it.date }
-    val headers = buildList {
-        add("date")
-        add("seizure_hours")
-        add("small_seizure_count")
-        add("big_seizure_count")
-        drugs.forEach { add("${it.lowercase()}_dosage_mg_morning_noon_evening") }
+private fun computeBackwardRolling(
+    rows: List<DailyRow>,
+    windows: List<Int>,
+): Map<Int, List<Pair<Int, Int>>> {
+    val smallPrefix = IntArray(rows.size + 1)
+    val bigPrefix = IntArray(rows.size + 1)
+    rows.forEachIndexed { i, r ->
+        smallPrefix[i + 1] = smallPrefix[i] + r.smallSeizures
+        bigPrefix[i + 1] = bigPrefix[i] + r.bigSeizures
     }
-
-    com.github.doyaaaaaken.kotlincsv.dsl.csvWriter().open(outFile) {
-        writeRow(headers)
-        rows.forEach { row ->
-            val values = mutableListOf<String>()
-            values += row.date.toString()
-            val hours = hoursByDate[row.date]
-                ?.map { it.hour?.toString() ?: "N/A" }
-                ?.joinToString(",") ?: ""
-            values += hours
-            values += row.smallSeizures.toString()
-            values += row.bigSeizures.toString()
-            drugs.forEach { drug ->
-                values += (row.drugDosages[drug]?.formatTriple() ?: "")
-            }
-            writeRow(values)
+    return windows.associateWith { w ->
+        rows.indices.map { i ->
+            val from = (i + 1 - w).coerceAtLeast(0)
+            val to = i + 1
+            (smallPrefix[to] - smallPrefix[from]) to (bigPrefix[to] - bigPrefix[from])
         }
     }
+}
+
+private fun computeRegimenIds(rows: List<DailyRow>, drugs: List<String>): IntArray {
+    val ids = IntArray(rows.size)
+    for (i in 1 until rows.size) {
+        val changed = drugs.any { rows[i].drugDosages[it] != rows[i - 1].drugDosages[it] }
+        ids[i] = if (changed) ids[i - 1] + 1 else ids[i - 1]
+    }
+    return ids
 }
 
 internal fun writeEventsCsv(events: List<Event>, tz: TimeZone, outFile: File, echo: (String) -> Unit): String {
     outFile.parentFile?.mkdirs()
 
     val headers = listOf("id", "summary", "start", "end", "color_id", "hour_of_day", "location", "description")
-    com.github.doyaaaaaken.kotlincsv.dsl.csvWriter().open(outFile) {
+    csvWriter().open(outFile) {
         writeRow(headers)
         events.forEach { event ->
             val start = event.start?.toInstant()?.toLocalDateTime(tz)?.toString() ?: ""
