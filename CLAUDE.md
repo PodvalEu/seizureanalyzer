@@ -22,7 +22,7 @@ docker run -v $(pwd)/data:/data seizureanalyzer
 
 - JDK 21, Kotlin 1.9, Gradle 8.6
 - Config lives in `config.env` (dotenv format)
-- Output files: `data/daily.csv`, `data/report.html`, `data/summary.json`, `data/seizure_events.csv`
+- Output files: `data/llm-export.csv`, `data/report.html`, `data/summary.json`, `data/seizure_events.csv`
 
 ## Project Structure
 
