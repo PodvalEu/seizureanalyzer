@@ -72,13 +72,13 @@ internal fun writeHtmlReport(
         }
     }
 
-    // Seizure series - only 30d visible by default
+    // Seizure series - only 14d visible by default
     // Big = bold red (dominant), Small = muted sage green (subdued background)
     data class SeizureStyle(val label: String, val smallColor: String, val bigColor: String, val totalColor: String, val defaultVisible: Boolean)
     val seizureStyles = mapOf(
         7 to SeizureStyle("7d", "#a3be8c", "#ef4444", "#6366f1", false),
-        14 to SeizureStyle("14d", "#8faa7b", "#dc2626", "#818cf8", false),
-        30 to SeizureStyle("30d", "#7a966a", "#b91c1c", "#4f46e5", true),
+        14 to SeizureStyle("14d", "#8faa7b", "#dc2626", "#818cf8", true),
+        30 to SeizureStyle("30d", "#7a966a", "#b91c1c", "#4f46e5", false),
     )
 
     val seizureSeries = Config.rollingWindows.flatMap { window ->
@@ -126,7 +126,7 @@ internal fun writeHtmlReport(
     val labelsJson = mapper.writeValueAsString(labels)
     val seriesJson = mapper.writeValueAsString(series)
 
-    // Build legend selected state: 7d and 14d off by default
+    // Build legend selected state: 7d and 30d off by default
     val legendSelected = mutableMapOf<String, Boolean>()
     seizureSeries.forEach { s ->
         val name = s["name"] as String
