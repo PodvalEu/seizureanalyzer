@@ -2,6 +2,8 @@
 
 Correlates epilepsy seizure frequency with medication dosage changes by pulling data from Google Calendar and generating interactive HTML reports, CSVs, and JSON summaries.
 
+**Live report: https://podvaleu.github.io/seizureanalyzer/**
+
 ## How it works
 
 1. Fetches events from a Google Calendar (drug changes, small/big seizures)
@@ -67,6 +69,10 @@ On first run, a browser window opens for Google OAuth. The token is cached in `d
 docker build -t seizureanalyzer .
 docker run -v $(pwd)/data:/data --env-file .env seizureanalyzer
 ```
+
+### GitHub Pages
+
+Every push to `main` triggers [`deploy-report.yml`](.github/workflows/deploy-report.yml), which regenerates the report and publishes it to https://podvaleu.github.io/seizureanalyzer/.
 
 ## Output
 
